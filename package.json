@@ -1,0 +1,56 @@
+{
+  "name": "derive-protocol",
+  "version": "1.0.0",
+  "description": "Decentralized Derivatives Trading Protocol For The Ethereum Blockchain",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "compile": "truffle compile",
+    "migrateDev": "truffle migrate --reset --network development",
+    "migrateRopsten": "truffle migrate --reset --network ropsten",
+    "migrateKovan": "truffle migrate --reset --network kovan",
+    "migrateRinkeby": "truffle migrate --network rinkeby",
+    "migrateMainnet": "truffle migrate --network mainnet",
+    "test": "truffle test",
+    "slither": "slither .",
+    "mythx": "truffle run verify --style table"
+  },
+  "dependencies": {
+    "dotenv": "^8.0.0",
+    "ethereumjs-tx": "^1.3.7",
+    "ethers": "^4.0.27",
+    "openzeppelin-solidity": "2.2.0",
+    "request": "^2.88.0",
+    "solc": "0.5.5",
+    "tabookey-gasless": "^0.4.0",
+    "truffle": "5.0.13",
+    "truffle-hdwallet-provider-privkey": "^1.0.3",
+    "truffle-security": "^1.4.2",
+    "web3": "1.0.0-beta.36"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/komodo-finance/DeriveProtocol.git"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "derivatives",
+    "blockchain",
+    "erc20"
+  ],
+  "author": "Phil Elsasser <phil@marketprotocol.io>, Stefan Ionescu <stefanionescu@protonmail.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/komodo-finance/DeriveProtocol/issues"
+  },
+  "homepage": "https://github.com/komodo-finance/DeriveProtocol#readme",
+  "engines": {
+    "node": ">=8.10.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
