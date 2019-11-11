@@ -36,18 +36,14 @@ contract MarketCollateralPool is Ownable {
     using SafeERC20 for ERC20;
 
     address public marketContractRegistry;
-    address public mktToken;
 
-    mapping(address => uint) public contractAddressToCollateralPoolBalance;                 // current balance of all collateral committed
-    mapping(address => uint) public feesCollectedByTokenAddress;
+    mapping(address => uint) public contractAddressToCollateralPoolBalance; // current balance of all collateral committed
 
     event TokensMinted(
         address indexed marketContract,
         address indexed user,
-        address indexed feeToken,
         uint qtyMinted,
-        uint collateralLocked,
-        uint feesPaid
+        uint collateralLocked
     );
 
     event TokensRedeemed (
@@ -58,9 +54,8 @@ contract MarketCollateralPool is Ownable {
         uint collateralUnlocked
     );
 
-    constructor(address marketContractRegistryAddress, address mktTokenAddress) public {
+    constructor(address marketContractRegistryAddress) public {
         marketContractRegistry = marketContractRegistryAddress;
-        mktToken = mktTokenAddress;
     }
 
     /*
@@ -72,11 +67,9 @@ contract MarketCollateralPool is Ownable {
     /// and issue them the requested qty of long and short tokens
     /// @param marketContractAddress            address of the market contract to redeem tokens for
     /// @param qtyToMint                      quantity of long / short tokens to mint.
-    /// @param isAttemptToPayInMKT            if possible, attempt to pay fee's in MKT rather than collateral tokens
     function mintPositionTokens(
         address marketContractAddress,
-        uint qtyToMint,
-        bool isAttemptToPayInMKT
+        uint qtyToMint
     ) external onlyWhiteListedAddress(marketContractAddress)
     {
 
@@ -85,41 +78,12 @@ contract MarketCollateralPool is Ownable {
 
         address collateralTokenAddress = marketContract.COLLATERAL_TOKEN_ADDRESS();
         uint neededCollateral = MathLib.multiply(qtyToMint, marketContract.COLLATERAL_PER_UNIT());
-        // the user has selected to pay fees in MKT and those fees are non zero (allowed) OR
-        // the user has selected not to pay fees in MKT, BUT the collateral token fees are disabled (0) AND the
-        // MKT fees are enabled (non zero).  (If both are zero, no fee exists)
-        bool isPayFeesInMKT = (isAttemptToPayInMKT &&
-            marketContract.MKT_TOKEN_FEE_PER_UNIT() != 0) ||
-            (!isAttemptToPayInMKT &&
-            marketContract.MKT_TOKEN_FEE_PER_UNIT() != 0 &&
-            marketContract.COLLATERAL_TOKEN_FEE_PER_UNIT() == 0);
 
-        uint feeAmount;
         uint totalCollateralTokenTransferAmount;
-        address feeToken;
-        if (isPayFeesInMKT) { // fees are able to be paid in MKT
-            feeAmount = MathLib.multiply(qtyToMint, marketContract.MKT_TOKEN_FEE_PER_UNIT());
-            totalCollateralTokenTransferAmount = neededCollateral;
-            feeToken = mktToken;
-
-            // EXTERNAL CALL - transferring ERC20 tokens from sender to this contract.  User must have called
-            // ERC20.approve in order for this call to succeed.
-            ERC20(mktToken).safeTransferFrom(msg.sender, address(this), feeAmount);
-        } else { // fee are either zero, or being paid in the collateral token
-            feeAmount = MathLib.multiply(qtyToMint, marketContract.COLLATERAL_TOKEN_FEE_PER_UNIT());
-            totalCollateralTokenTransferAmount = neededCollateral.add(feeAmount);
-            feeToken = collateralTokenAddress;
-            // we will transfer collateral and fees all at once below.
-        }
 
         // EXTERNAL CALL - transferring ERC20 tokens from sender to this contract.  User must have called
         // ERC20.approve in order for this call to succeed.
-        ERC20(marketContract.COLLATERAL_TOKEN_ADDRESS()).safeTransferFrom(msg.sender, address(this), totalCollateralTokenTransferAmount);
-
-        if (feeAmount != 0) {
-            // update the fee's collected balance
-            feesCollectedByTokenAddress[feeToken] = feesCollectedByTokenAddress[feeToken].add(feeAmount);
-        }
+        ERC20(marketContract.COLLATERAL_TOKEN_ADDRESS()).safeTransferFrom(msg.sender, address(this), neededCollateral);
 
         // Update the collateral pool locked balance.
         contractAddressToCollateralPoolBalance[marketContractAddress] = contractAddressToCollateralPoolBalance[
@@ -132,10 +96,8 @@ contract MarketCollateralPool is Ownable {
         emit TokensMinted(
             marketContractAddress,
             msg.sender,
-            feeToken,
             qtyToMint,
-            neededCollateral,
-            feeAmount
+            neededCollateral
         );
     }
 
@@ -221,25 +183,6 @@ contract MarketCollateralPool is Ownable {
             shortQtyToRedeem,
             collateralToReturn
         );
-    }
-
-    /// @dev allows the owner to remove the fees paid into this contract for minting
-    /// @param feeTokenAddress - address of the erc20 token fees have been paid in
-    /// @param feeRecipient - Recipient address of fees
-    function withdrawFees(address feeTokenAddress, address feeRecipient) public onlyOwner {
-        uint feesAvailableForWithdrawal = feesCollectedByTokenAddress[feeTokenAddress];
-        require(feesAvailableForWithdrawal != 0, "No fees available for withdrawal");
-        require(feeRecipient != address(0), "Cannot send fees to null address");
-        feesCollectedByTokenAddress[feeTokenAddress] = 0;
-        // EXTERNAL CALL
-        ERC20(feeTokenAddress).safeTransfer(feeRecipient, feesAvailableForWithdrawal);
-    }
-
-    /// @dev allows the owner to update the mkt token address in use for fees
-    /// @param mktTokenAddress address of new MKT token
-    function setMKTTokenAddress(address mktTokenAddress) public onlyOwner {
-        require(mktTokenAddress != address(0), "Cannot set MKT Token Address To Null");
-        mktToken = mktTokenAddress;
     }
 
     /// @dev allows the owner to update the mkt token address in use for fees

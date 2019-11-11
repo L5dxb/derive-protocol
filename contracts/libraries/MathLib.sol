@@ -100,16 +100,5 @@ library MathLib {
     {
         return multiply(subtract(priceCap, priceFloor), qtyMultiplier);
     }
-
-    /// @notice calculates the fee in terms of base units of the collateral token per unit pair minted.
-    function calculateFeePerUnit(
-        uint priceFloor,
-        uint priceCap,
-        uint qtyMultiplier,
-        uint feeInBasisPoints
-    ) pure internal returns (uint)
-    {
-        uint midPrice = add(priceCap, priceFloor) / 2;
-        return multiply(multiply(midPrice, qtyMultiplier), feeInBasisPoints) / 10000;
-    }
+    
 }
