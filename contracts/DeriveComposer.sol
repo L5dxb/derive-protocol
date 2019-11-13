@@ -12,42 +12,53 @@ contract DeriveComposer is Ownable {
   using SafeMath for uint;
 
   event Joined(address sender, address positions, uint derivative, uint minted);
+  event Exited(address sender, address positions, uint derivative, uint minted);
 
   uint256 public live;
-  uint256 public lock;
 
-  mapping(address => bool) public whitelisted;
-  mapping(address => address) public neutrals;
+  mapping(address => bool)                        public whitelisted;
+  mapping(address => address)                     public neutrals;
   mapping(address => mapping(address => uint256)) public contributions;
   mapping(address => mapping(address => uint256)) public minted;
-  mapping(address => mapping(address => uint256)) public free;
 
-  constructor(uint256 lock_) public {
+  constructor() public {
     live = 1;
-    lock = lock_;
   }
 
-  function join(address positions, uint wad) external {
+  function join(address position, uint wad) external {
     require(live == 1, "Contract is not live");
-    require(whitelisted[positions] == true, "This positions contract is not whitelisted");
-    require(neutrals[positions] != address(0), "Neutral not set");
-    require(INeutralJoin(neutrals[positions]).gem() == IDeriveContract(positions).COLLATERAL_TOKEN_ADDRESS(), "Join contract has a different gem");
-    require(IDeriveContract(positions).isSettled() == false, "Contract already settled");
-    require(IERC20(IDeriveContract(positions).LONG_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
-    require(IERC20(IDeriveContract(positions).SHORT_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
+    require(whitelisted[position] == true, "This position contract is not whitelisted");
+    require(neutrals[position] != address(0), "Neutral not set");
+    require(INeutralJoin(neutrals[position]).gem() == IDeriveContract(position).COLLATERAL_TOKEN_ADDRESS(), "Join contract has a different gem");
+    require(IDeriveContract(position).isSettled() == false, "Contract already settled");
+    require(IERC20(IDeriveContract(position).LONG_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
+    require(IERC20(IDeriveContract(position).SHORT_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
 
-    uint toMint = MathLib.multiply(wad, IDeriveContract(positions).COLLATERAL_PER_UNIT());
+    uint toMint = MathLib.multiply(wad, IDeriveContract(position).COLLATERAL_PER_UNIT());
 
-    free[msg.sender][neutrals[positions]] = now.add(lock);
-    contributions[msg.sender][neutrals[positions]] = contributions[msg.sender][neutrals[positions]].add(wad);
-    minted[msg.sender][neutrals[positions]] = toMint;
+    contributions[msg.sender][neutrals[position]] = contributions[msg.sender][neutrals[position]].add(wad);
+    minted[msg.sender][neutrals[position]] = minted[msg.sender][neutrals[position]].add(toMint);
 
-    require(INeutralJoin(neutrals[positions]).mint(msg.sender, toMint) == true, "Could not mint");
+    require(INeutralJoin(neutrals[position]).mint(msg.sender, toMint) == true, "Could not mint");
 
-    emit Joined(msg.sender, positions, wad, toMint);
+    emit Joined(msg.sender, position, wad, toMint);
   }
 
-  function exit() external {}
+  function exit(address position, uint wad) external {
+    require(neutrals[position] != address(0), "Neutral not set");
+
+    require(INeutralJoin(neutrals[position]).burn(msg.sender, wad) == true, "Could not burn");
+
+    uint toFree = wad / IDeriveContract(position).COLLATERAL_PER_UNIT();
+
+    contributions[msg.sender][neutrals[position]] = contributions[msg.sender][neutrals[position]].sub(toFree);
+    minted[msg.sender][neutrals[position]] = minted[msg.sender][neutrals[position]].sub(wad);
+
+    require(IERC20(IDeriveContract(position).LONG_POSITION_TOKEN()).transfer(msg.sender, toFree) == true);
+    require(IERC20(IDeriveContract(position).SHORT_POSITION_TOKEN()).transfer(msg.sender, toFree) == true);
+
+    emit Exited(msg.sender, position, toFree, wad);
+  }
 
   //OWNER
 
@@ -57,7 +68,7 @@ contract DeriveComposer is Ownable {
   }
 
   function file(bytes32 what, address who, address wad) external onlyOwner {
-    if (what == "neutrals") neutrals[who] = wad;
+    if (what == "neutrals" && neutrals[who] == address(0)) neutrals[who] = wad;
     else revert();
   }
 

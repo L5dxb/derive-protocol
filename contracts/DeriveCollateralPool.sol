@@ -17,45 +17,45 @@
 pragma solidity 0.5.11;
 
 import "./libraries/MathLib.sol";
-import "./MarketContract.sol";
+import "./DeriveContract.sol";
 import "./tokens/PositionToken.sol";
-import "./MarketContractRegistryInterface.sol";
+import "./DeriveContractRegistryInterface.sol";
 
 import "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
-/// @title MarketCollateralPool
-/// @notice This collateral pool houses all of the collateral for all market contracts currently in circulation.
+/// @title DeriveCollateralPool
+/// @notice This collateral pool houses all of the collateral for all derive contracts currently in circulation.
 /// This pool facilitates locking of collateral and minting / redemption of position tokens for that collateral.
 /// @author Phil Elsasser <phil@marketprotocol.io>
-contract MarketCollateralPool is Ownable {
+contract DeriveCollateralPool is Ownable {
     using MathLib for uint;
     using MathLib for int;
     using SafeERC20 for ERC20;
 
-    address public marketContractRegistry;
+    address public deriveContractRegistry;
 
     mapping(address => uint) public contractAddressToCollateralPoolBalance; // current balance of all collateral committed
 
     event TokensMinted(
-        address indexed marketContract,
+        address indexed deriveContract,
         address indexed user,
         uint qtyMinted,
         uint collateralLocked
     );
 
     event TokensRedeemed (
-        address indexed marketContract,
+        address indexed deriveContract,
         address indexed user,
         uint longQtyRedeemed,
         uint shortQtyRedeemed,
         uint collateralUnlocked
     );
 
-    constructor(address marketContractRegistryAddress) public {
-        marketContractRegistry = marketContractRegistryAddress;
+    constructor(address deriveContractRegistryAddress) public {
+        deriveContractRegistry = deriveContractRegistryAddress;
     }
 
     /*
@@ -63,38 +63,38 @@ contract MarketCollateralPool is Ownable {
     */
 
     /// @notice Called by a user that would like to mint a new set of long and short token for a specified
-    /// market contract.  This will transfer and lock the correct amount of collateral into the pool
+    /// derive contract.  This will transfer and lock the correct amount of collateral into the pool
     /// and issue them the requested qty of long and short tokens
-    /// @param marketContractAddress            address of the market contract to redeem tokens for
+    /// @param deriveContractAddress            address of the derive contract to redeem tokens for
     /// @param qtyToMint                      quantity of long / short tokens to mint.
     function mintPositionTokens(
-        address marketContractAddress,
+        address deriveContractAddress,
         uint qtyToMint
-    ) external onlyWhiteListedAddress(marketContractAddress)
+    ) external onlyWhiteListedAddress(deriveContractAddress)
     {
 
-        MarketContract marketContract = MarketContract(marketContractAddress);
-        require(!marketContract.isSettled(), "Contract is already settled");
+        DeriveContract deriveContract = DeriveContract(deriveContractAddress);
+        require(!deriveContract.isSettled(), "Contract is already settled");
 
-        address collateralTokenAddress = marketContract.COLLATERAL_TOKEN_ADDRESS();
-        uint neededCollateral = MathLib.multiply(qtyToMint, marketContract.COLLATERAL_PER_UNIT());
+        address collateralTokenAddress = deriveContract.COLLATERAL_TOKEN_ADDRESS();
+        uint neededCollateral = MathLib.multiply(qtyToMint, deriveContract.COLLATERAL_PER_UNIT());
 
         uint totalCollateralTokenTransferAmount;
 
         // EXTERNAL CALL - transferring ERC20 tokens from sender to this contract.  User must have called
         // ERC20.approve in order for this call to succeed.
-        ERC20(marketContract.COLLATERAL_TOKEN_ADDRESS()).safeTransferFrom(msg.sender, address(this), neededCollateral);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransferFrom(msg.sender, address(this), neededCollateral);
 
         // Update the collateral pool locked balance.
-        contractAddressToCollateralPoolBalance[marketContractAddress] = contractAddressToCollateralPoolBalance[
-            marketContractAddress
+        contractAddressToCollateralPoolBalance[deriveContractAddress] = contractAddressToCollateralPoolBalance[
+            deriveContractAddress
         ].add(neededCollateral);
 
         // mint and distribute short and long position tokens to our caller
-        marketContract.mintPositionTokens(qtyToMint, msg.sender);
+        deriveContract.mintPositionTokens(qtyToMint, msg.sender);
 
         emit TokensMinted(
-            marketContractAddress,
+            deriveContractAddress,
             msg.sender,
             qtyToMint,
             neededCollateral
@@ -103,30 +103,30 @@ contract MarketCollateralPool is Ownable {
 
     /// @notice Called by a user that currently holds both short and long position tokens and would like to redeem them
     /// for their collateral.
-    /// @param marketContractAddress            address of the market contract to redeem tokens for
+    /// @param deriveContractAddress            address of the derive contract to redeem tokens for
     /// @param qtyToRedeem                      quantity of long / short tokens to redeem.
     function redeemPositionTokens(
-        address marketContractAddress,
+        address deriveContractAddress,
         uint qtyToRedeem
-    ) external onlyWhiteListedAddress(marketContractAddress)
+    ) external onlyWhiteListedAddress(deriveContractAddress)
     {
-        MarketContract marketContract = MarketContract(marketContractAddress);
+        DeriveContract deriveContract = DeriveContract(deriveContractAddress);
 
-        marketContract.redeemLongToken(qtyToRedeem, msg.sender);
-        marketContract.redeemShortToken(qtyToRedeem, msg.sender);
+        deriveContract.redeemLongToken(qtyToRedeem, msg.sender);
+        deriveContract.redeemShortToken(qtyToRedeem, msg.sender);
 
         // calculate collateral to return and update pool balance
-        uint collateralToReturn = MathLib.multiply(qtyToRedeem, marketContract.COLLATERAL_PER_UNIT());
-        contractAddressToCollateralPoolBalance[marketContractAddress] = contractAddressToCollateralPoolBalance[
-            marketContractAddress
+        uint collateralToReturn = MathLib.multiply(qtyToRedeem, deriveContract.COLLATERAL_PER_UNIT());
+        contractAddressToCollateralPoolBalance[deriveContractAddress] = contractAddressToCollateralPoolBalance[
+            deriveContractAddress
         ].subtract(collateralToReturn);
 
         // EXTERNAL CALL
         // transfer collateral back to user
-        ERC20(marketContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
 
         emit TokensRedeemed(
-            marketContractAddress,
+            deriveContractAddress,
             msg.sender,
             qtyToRedeem,
             qtyToRedeem,
@@ -137,47 +137,47 @@ contract MarketCollateralPool is Ownable {
     // @notice called by a user after settlement has occurred.  This function will finalize all accounting around any
     // outstanding positions and return all remaining collateral to the caller. This should only be called after
     // settlement has occurred.
-    /// @param marketContractAddress address of the MARKET Contract being traded.
+    /// @param deriveContractAddress address of the DERIVE Contract being traded.
     /// @param longQtyToRedeem qty to redeem of long tokens
     /// @param shortQtyToRedeem qty to redeem of short tokens
     function settleAndClose(
-        address marketContractAddress,
+        address deriveContractAddress,
         uint longQtyToRedeem,
         uint shortQtyToRedeem
-    ) external onlyWhiteListedAddress(marketContractAddress)
+    ) external onlyWhiteListedAddress(deriveContractAddress)
     {
-        MarketContract marketContract = MarketContract(marketContractAddress);
-        require(marketContract.isPostSettlementDelay(), "Contract is not past settlement delay");
+        DeriveContract deriveContract = DeriveContract(deriveContractAddress);
+        require(deriveContract.isPostSettlementDelay(), "Contract is not past settlement delay");
 
         // burn tokens being redeemed.
         if (longQtyToRedeem > 0) {
-            marketContract.redeemLongToken(longQtyToRedeem, msg.sender);
+            deriveContract.redeemLongToken(longQtyToRedeem, msg.sender);
         }
 
         if (shortQtyToRedeem > 0) {
-            marketContract.redeemShortToken(shortQtyToRedeem, msg.sender);
+            deriveContract.redeemShortToken(shortQtyToRedeem, msg.sender);
         }
 
 
         // calculate amount of collateral to return and update pool balances
         uint collateralToReturn = MathLib.calculateCollateralToReturn(
-            marketContract.PRICE_FLOOR(),
-            marketContract.PRICE_CAP(),
-            marketContract.QTY_MULTIPLIER(),
+            deriveContract.PRICE_FLOOR(),
+            deriveContract.PRICE_CAP(),
+            deriveContract.QTY_MULTIPLIER(),
             longQtyToRedeem,
             shortQtyToRedeem,
-            marketContract.settlementPrice()
+            deriveContract.settlementPrice()
         );
 
-        contractAddressToCollateralPoolBalance[marketContractAddress] = contractAddressToCollateralPoolBalance[
-            marketContractAddress
+        contractAddressToCollateralPoolBalance[deriveContractAddress] = contractAddressToCollateralPoolBalance[
+            deriveContractAddress
         ].subtract(collateralToReturn);
 
         // return collateral tokens
-        ERC20(marketContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
 
         emit TokensRedeemed(
-            marketContractAddress,
+            deriveContractAddress,
             msg.sender,
             longQtyToRedeem,
             shortQtyToRedeem,
@@ -186,23 +186,23 @@ contract MarketCollateralPool is Ownable {
     }
 
     /// @dev allows the owner to update the mkt token address in use for fees
-    /// @param marketContractRegistryAddress address of new contract registry
-    function setMarketContractRegistryAddress(address marketContractRegistryAddress) public onlyOwner {
-        require(marketContractRegistryAddress != address(0), "Cannot set Market Contract Registry Address To Null");
-        marketContractRegistry = marketContractRegistryAddress;
+    /// @param deriveContractRegistryAddress address of new contract registry
+    function setDeriveContractRegistryAddress(address deriveContractRegistryAddress) public onlyOwner {
+        require(deriveContractRegistryAddress != address(0), "Cannot set Derive Contract Registry Address To Null");
+        deriveContractRegistry = deriveContractRegistryAddress;
     }
 
     /*
     // MODIFIERS
     */
 
-    /// @notice only can be called with a market contract address that currently exists in our whitelist
-    /// this ensure's it is a market contract that has been created by us and therefore has a uniquely created
+    /// @notice only can be called with a derive contract address that currently exists in our whitelist
+    /// this ensure's it is a derive contract that has been created by us and therefore has a uniquely created
     /// long and short token address.  If it didn't we could have spoofed contracts minting tokens with a
     /// collateral token that wasn't the same as the intended token.
-    modifier onlyWhiteListedAddress(address marketContractAddress) {
+    modifier onlyWhiteListedAddress(address deriveContractAddress) {
         require(
-            MarketContractRegistryInterface(marketContractRegistry).isAddressWhiteListed(marketContractAddress),
+            DeriveContractRegistryInterface(deriveContractRegistry).isAddressWhiteListed(deriveContractAddress),
             "Contract is not whitelisted"
         );
         _;

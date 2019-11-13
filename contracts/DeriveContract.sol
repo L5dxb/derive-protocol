@@ -23,11 +23,11 @@ import "./libraries/StringLib.sol";
 import "./tokens/PositionToken.sol";
 
 
-/// @title MarketContract base contract implement all needed functionality for trading.
+/// @title DeriveContract base contract implement all needed functionality for trading.
 /// @notice this is the abstract base contract that all contracts should inherit from to
 /// implement different oracle solutions.
 /// @author Phil Elsasser <phil@marketprotocol.io>
-contract MarketContract is Ownable {
+contract DeriveContract is Ownable {
     using StringLib for *;
 
     string public CONTRACT_NAME;
@@ -54,7 +54,7 @@ contract MarketContract is Ownable {
     event ContractSettled(uint settlePrice);
 
     /// @param contractNames bytes32 array of names
-    ///     contractName            name of the market contract
+    ///     contractName            name of the derive contract
     ///     longTokenSymbol         symbol for the long token
     ///     shortTokenSymbol        symbol for the short token
     /// @param baseAddresses array of 3 addresses needed for our contract including:

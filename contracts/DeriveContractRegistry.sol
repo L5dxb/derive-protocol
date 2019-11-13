@@ -17,12 +17,12 @@
 pragma solidity 0.5.11;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
-import "./MarketContractRegistryInterface.sol";
+import "./DeriveContractRegistryInterface.sol";
 
 
-/// @title MarketContractRegistry
+/// @title DeriveContractRegistry
 /// @author Phil Elsasser <phil@marketprotocol.io>
-contract MarketContractRegistry is Ownable, MarketContractRegistryInterface {
+contract DeriveContractRegistry is Ownable, DeriveContractRegistryInterface {
 
     // whitelist accounting
     mapping(address => bool) public isWhiteListed;
@@ -39,7 +39,7 @@ contract MarketContractRegistry is Ownable, MarketContractRegistryInterface {
     // External Methods
     */
 
-    /// @notice determines if an address is a valid MarketContract
+    /// @notice determines if an address is a valid DeriveContract
     /// @return false if the address is not white listed.
     function isAddressWhiteListed(address contractAddress) external view returns (bool) {
         return isWhiteListed[contractAddress];
@@ -81,7 +81,7 @@ contract MarketContractRegistry is Ownable, MarketContractRegistryInterface {
         emit AddressAddedToWhitelist(contractAddress);
     }
 
-    /// @dev allows for the owner to add a new address of a factory responsible for creating new market contracts
+    /// @dev allows for the owner to add a new address of a factory responsible for creating new derive contracts
     /// @param factoryAddress address of factory to be allowed to add contracts to whitelist
     function addFactoryAddress(address factoryAddress) external onlyOwner {
         require(!factoryAddressWhiteList[factoryAddress], "address already added");

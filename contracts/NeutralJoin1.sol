@@ -50,9 +50,9 @@ contract NeutralJoin1 is MinterRole, Ownable {
         return true;
     }
 
-    function burn(uint256 match_, uint256 amount) public {
-        require(balances[msg.sender].sub(amount) >= lock[msg.sender], "NeutralJoin/too-many-locked-tokens");
-        balances[msg.sender] = balances[msg.sender].sub(amount);
+    function burn(address account, uint256 amount) public onlyMinter returns (bool) {
+        require(balances[account].sub(amount) >= lock[account], "NeutralJoin/too-many-locked-tokens");
+        balances[account] = balances[account].sub(amount);
     }
 
     function join(address usr, uint wad) public note {

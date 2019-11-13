@@ -48,7 +48,7 @@ contract PositionToken is ERC20, Ownable {
         MARKET_SIDE = MarketSide(marketSide);
     }
 
-    /// @dev Called by our MarketContract (owner) to create a long or short position token. These tokens are minted,
+    /// @dev Called by our DeriveContract (owner) to create a long or short position token. These tokens are minted,
     /// and then transferred to our recipient who is the party who is minting these tokens.  The collateral pool
     /// is the only caller (acts as the owner) because collateral must be deposited / locked prior to minting of new
     /// position tokens
@@ -62,7 +62,7 @@ contract PositionToken is ERC20, Ownable {
         _mint(recipient, qtyToMint);
     }
 
-    /// @dev Called by our MarketContract (owner) when redemption occurs.  This means that either a single user is redeeming
+    /// @dev Called by our DeriveContract (owner) when redemption occurs.  This means that either a single user is redeeming
     /// both short and long tokens in order to claim their collateral, or the contract has settled, and only a single
     /// side of the tokens are needed to redeem (handled by the collateral pool)
     /// @param qtyToRedeem quantity of tokens to burn (remove from supply / circulation)

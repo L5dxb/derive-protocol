@@ -16,21 +16,21 @@
 
 pragma solidity 0.5.11;
 
-import "./MarketContractMPX.sol";
-import "../MarketContractRegistryInterface.sol";
+import "./DeriveContractDPX.sol";
+import "../DeriveContractRegistryInterface.sol";
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 
-/// @title MarketContractFactoryMPX
+/// @title DeriveContractFactoryDPX
 /// @author Phil Elsasser <phil@marketprotocol.io>
-contract MarketContractFactoryMPX is Ownable {
+contract DeriveContractFactoryDPX is Ownable {
 
-    address public marketContractRegistry;
+    address public deriveContractRegistry;
     address public oracleHub;
-    address public MARKET_COLLATERAL_POOL;
+    address public DERIVE_COLLATERAL_POOL;
 
-    event MarketContractCreated(address indexed creator, address indexed contractAddress);
+    event DeriveContractCreated(address indexed creator, address indexed contractAddress);
 
     /// @dev deploys our factory and ties it to the supplied registry address
     /// @param registryAddress - address of our MARKET registry
@@ -45,8 +45,8 @@ contract MarketContractFactoryMPX is Ownable {
         require(collateralPoolAddress != address(0), "collateralPoolAddress can not be null");
         require(oracleHubAddress != address(0), "oracleHubAddress can not be null");
 
-        marketContractRegistry = registryAddress;
-        MARKET_COLLATERAL_POOL = collateralPoolAddress;
+        deriveContractRegistry = registryAddress;
+        DERIVE_COLLATERAL_POOL = collateralPoolAddress;
         oracleHub = oracleHubAddress;
     }
 
@@ -65,7 +65,7 @@ contract MarketContractFactoryMPX is Ownable {
     ///     expirationTimeStamp     seconds from epoch that this contract expires and enters settlement
     /// @param oracleURL url of data
     /// @param oracleStatistic statistic type (lastPrice, vwap, etc)
-    function deployMarketContractMPX(
+    function deployDeriveContractDPX(
         bytes32[3] calldata contractNames,
         address collateralTokenAddress,
         uint[5] calldata contractSpecs,
@@ -73,12 +73,12 @@ contract MarketContractFactoryMPX is Ownable {
         string calldata oracleStatistic
     ) external onlyOwner
     {
-        MarketContractMPX mktContract = new MarketContractMPX(
+        DeriveContractDPX drvContract = new DeriveContractDPX(
             contractNames,
             [
             owner(),
             collateralTokenAddress,
-            MARKET_COLLATERAL_POOL
+            DERIVE_COLLATERAL_POOL
             ],
             oracleHub,
             contractSpecs,
@@ -86,15 +86,15 @@ contract MarketContractFactoryMPX is Ownable {
             oracleStatistic
         );
 
-        MarketContractRegistryInterface(marketContractRegistry).addAddressToWhiteList(address(mktContract));
-        emit MarketContractCreated(msg.sender, address(mktContract));
+        DeriveContractRegistryInterface(deriveContractRegistry).addAddressToWhiteList(address(drvContract));
+        emit DeriveContractCreated(msg.sender, address(drvContract));
     }
 
     /// @dev allows for the owner to set the desired registry for contract creation.
     /// @param registryAddress desired registry address.
     function setRegistryAddress(address registryAddress) external onlyOwner {
         require(registryAddress != address(0), "registryAddress can not be null");
-        marketContractRegistry = registryAddress;
+        deriveContractRegistry = registryAddress;
     }
 
     /// @dev allows for the owner to set a new oracle hub address which is responsible for providing data to our

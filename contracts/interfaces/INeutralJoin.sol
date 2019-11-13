@@ -6,5 +6,6 @@ contract INeutralJoin {
   function balances(address) public view returns (uint256);
   function gem() public view returns (address);
   function mint(address account, uint256 amount) public returns (bool);
+  function burn(address account, uint256 amount) public returns (bool);
 
 }

@@ -16,12 +16,11 @@
 
 pragma solidity 0.5.11;
 
-import "../MarketContract.sol";
+import "../DeriveContract.sol";
 
-
-/// @title MarketContractMPX - a MarketContract designed to be used with our internal oracle service
+/// @title DervieContractDPX - a DeriveContract designed to be used with our internal oracle service
 /// @author Phil Elsasser <phil@marketprotocol.io>
-contract MarketContractMPX is MarketContract {
+contract DeriveContractDPX is DeriveContract {
 
     address public ORACLE_HUB_ADDRESS;
     string public ORACLE_URL;
@@ -52,7 +51,7 @@ contract MarketContractMPX is MarketContract {
         uint[5] memory contractSpecs,
         string memory oracleURL,
         string memory oracleStatistic
-    ) MarketContract(
+    ) DeriveContract(
         contractNames,
         baseAddresses,
         contractSpecs
