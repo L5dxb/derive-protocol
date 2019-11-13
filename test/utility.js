@@ -1,13 +1,57 @@
 const BN = require('bn.js');
+var Web3 = require("web3");
 const DeriveContractDPX = artifacts.require('DeriveContractDPX');
 const Utils = require('web3-utils');
 
-const {
-  AbstractMethodFactory,
-  GetBlockByNumberMethod,
-  AbstractMethod
-} = require('web3-core-method');
 const { formatters } = require('web3-core-helpers');
+
+const OPTIONS = {
+  defaultBlock: "latest",
+  transactionConfirmationBlocks: 1,
+  transactionBlockTimeout: 5
+};
+
+var web3 = new Web3(
+  new Web3
+  .providers
+  .HttpProvider
+  ("http://localhost:8545"), null, OPTIONS);
+
+async function increase(duration) {
+  await advanceTime(duration);
+  await advanceBlock();
+}
+
+async function advanceTime(time) {
+
+  return new Promise((resolve, reject) => {
+      web3.currentProvider.send({
+          jsonrpc: "2.0",
+          method: "evm_increaseTime",
+          params: [time],
+          id: new Date().getTime()
+      }, (err, result) => {
+          if (err) { return reject(err); }
+          return resolve(result);
+      });
+  });
+
+}
+
+async function advanceBlock() {
+  return new Promise((resolve, reject) => {
+      web3.currentProvider.send({
+          jsonrpc: "2.0",
+          method: "evm_mine",
+          id: new Date().getTime()
+      }, (err, result) => {
+          if (err) { return reject(err); }
+          const newBlockHash = web3.eth.getBlock('latest').hash;
+
+          return resolve(newBlockHash)
+      });
+  });
+}
 
 module.exports = {
   /**
@@ -109,9 +153,7 @@ module.exports = {
     );
   },
 
-  increase(duration) {
-    return new EVMManipulator(web3.currentProvider).increase(duration);
-  },
+  increase,
 
   expirationInDays(days) {
     const daysInSeconds = 60 * 60 * 24 * days;
