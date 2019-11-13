@@ -158,15 +158,4 @@ contract TestMathLib {
         (bool success, bytes memory returndata) = address(this).call(test_abi);
         Assert.isFalse(success, "total collateral should fail for abnormal price margins");
     }
-
-    function testCalculateFeePerUnit() public {
-        uint priceFloor = 1000;
-        uint priceCap = 2000;
-        uint multiplier = 1000;
-        uint feeAmountInBasis = 100; // 1 percent fee.
-        uint fee = MathLib.calculateFeePerUnit(priceFloor, priceCap, multiplier, feeAmountInBasis);
-        uint expectedFeeAmount = 15000; // midpoint * multiplier * 1% (100 basis points)
-        Assert.equal(fee, expectedFeeAmount, "Fee amount should be equal to midpoint * multiplier * percent");
-    }
 }
-

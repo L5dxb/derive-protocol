@@ -1,61 +1,13 @@
 const BN = require('bn.js');
-const MarketContractMPX = artifacts.require('MarketContractMPX');
+const DeriveContractDPX = artifacts.require('DeriveContractDPX');
 const Utils = require('web3-utils');
 
-const { AbstractWeb3Module } = require('web3-core');
 const {
   AbstractMethodFactory,
   GetBlockByNumberMethod,
   AbstractMethod
 } = require('web3-core-method');
 const { formatters } = require('web3-core-helpers');
-
-class EVMManipulator extends AbstractWeb3Module {
-  /**
-   * @param {AbstractSocketProvider|HttpProvider|CustomProvider|String} provider
-   *
-   * @constructor
-   */
-  constructor(provider) {
-    super(provider);
-  }
-
-  /**
-   * Creates and evm snapshot
-   *
-   * @returns {Promise<string>} evm snapshot Id
-   */
-  createSnapshot() {
-    const method = new AbstractMethod('evm_snapshot', 0, Utils, formatters, this);
-    method.setArguments(arguments);
-
-    return method.execute();
-  }
-
-  /**
-   * Restores the EVM to the snapshot set in id
-   *
-   * @param {string} snapshotId
-   */
-  restoreSnapshot(snapshotId) {
-    const method = new AbstractMethod('evm_revert', 1, Utils, formatters, this);
-    method.setArguments([snapshotId]);
-
-    return method.execute();
-  }
-
-  increase(duration) {
-    const increaseTimeMethod = new AbstractMethod('evm_increaseTime', 1, Utils, formatters, this);
-    increaseTimeMethod.setArguments([duration]);
-
-    return increaseTimeMethod.execute().then(() => {
-      const mineMethod = new AbstractMethod('evm_mine', 0, Utils, formatters, this);
-      mineMethod.setArguments([]);
-
-      return mineMethod.execute();
-    });
-  }
-}
 
 module.exports = {
   /**
@@ -101,24 +53,25 @@ module.exports = {
   },
 
   /**
-   * Create MarketContract
+   * Create DeriveContract
    *
    * @param {CollateralToken} collateralToken
-   * @param {MarketCollateralPool} collateralPool
+   * @param {DeriveCollateralPool} collateralPool
    * @param {string} userAddress
    * @param {string | null} oracleHubAddress
    * @param {number[] | null} contractSpecs
-   * @return {MarketContractMPX}
+   * @return {DeriveContractDPX}
    */
-  createMarketContract(
+  createDeriveContract(
+    coin,
     collateralToken,
     collateralPool,
     userAddress,
     oracleHubAddress,
     contractSpecs
   ) {
-    const expiration = Math.round(new Date().getTime() / 1000 + 60 * 50); // order expires 50 minutes from now.
-    const oracleURL = 'api.coincap.io/v2/rates/bitcoin';
+    const expiration = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30; // expires in 30 days
+    var oracleURL = 'api.coincap.io/v2/rates/usdc';
     const oracleStatistic = 'rateUSD';
 
     if (!oracleHubAddress) {
@@ -126,15 +79,27 @@ module.exports = {
     }
 
     if (!contractSpecs) {
-      contractSpecs = [0, 150, 2, 2, 100, 50, expiration];
+      contractSpecs = [0, 150, 2, 2, expiration];
     }
-    const contractNames = [
-      web3.utils.asciiToHex('BTC', 32),
-      web3.utils.asciiToHex('LBTC', 32),
-      web3.utils.asciiToHex('SBTC', 32)
+
+    var contractNames = [
+      web3.utils.asciiToHex('DING', 32),
+      web3.utils.asciiToHex('LDING', 32),
+      web3.utils.asciiToHex('SDING', 32)
     ];
 
-    return MarketContractMPX.new(
+    if (coin.toLowerCase() != "ding") {
+
+      oracleURL = 'api.coincap.io/v2/rates/ethereum';
+      contractNames = [
+        web3.utils.asciiToHex('ETH', 32),
+        web3.utils.asciiToHex('LETH', 32),
+        web3.utils.asciiToHex('SETH', 32)
+      ];
+
+    }
+
+    return DeriveContractDPX.new(
       contractNames,
       [userAddress, collateralToken.address, collateralPool.address],
       oracleHubAddress,
@@ -154,34 +119,16 @@ module.exports = {
   },
 
   /**
-   * Creates an EVM Snapshot and returns a Promise that resolves to the id of the snapshot.
-   *
-   * @returns {Promise<string>} snapshotId
-   */
-  createEVMSnapshot() {
-    return new EVMManipulator(web3.currentProvider).createSnapshot();
-  },
-
-  /**
-   * Restores the EVM to the snapshot set in id
-   *
-   * @param {string} snapshotId
-   */
-  restoreEVMSnapshotsnapshotId(snapshotId) {
-    return new EVMManipulator(web3.currentProvider).restoreSnapshot(snapshotId);
-  },
-
-  /**
    * Settle MarketContract
    *
-   * @param {MarketContractMPX} marketContract
+   * @param {DeriveContractMPX} deriveContract
    * @param {number} settlementPrice
    * @param {string} userAddress
    * @return {MarketContractMPX}
    */
-  async settleContract(marketContract, settlementPrice, userAddress) {
-    await marketContract.arbitrateSettlement(settlementPrice, { from: userAddress }); // price above cap!
-    return await marketContract.settlementPrice.call({ from: userAddress });
+  async settleContract(deriveContract, settlementPrice, userAddress) {
+    await deriveContract.arbitrateSettlement(settlementPrice, { from: userAddress }); // price above cap!
+    return await deriveContract.settlementPrice.call({ from: userAddress });
   },
 
   async shouldFail(block, message, errorContainsMessage, containsMessage) {

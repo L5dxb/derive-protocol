@@ -9,42 +9,44 @@ contract OracleHub is Ownable {
 
   event Requested(address feed);
   event Completed(address feed);
-  event Updated(int128 price);
+  event Updated(address derive, int128 price);
 
-  mapping(address => address) public feeds;
-  mapping(address => uint256) public fees;
+  address oracle;
+  uint256 fee;
 
-  constructor() public {}
+  mapping(address => uint256) public feeds;
 
-  function file(bytes32 what, address who, address wad) external onlyOwner {
+  constructor(address oracle_) public {
+    oracle = oracle_;
+  }
+
+  function file(bytes32 what, address who, uint256 wad) external onlyOwner {
     if (what == "feeds") feeds[who] = wad;
     else revert();
   }
 
-  function file(bytes32 what, address who, uint256 wad) external onlyOwner {
-    if (what == "fees") fees[who] = wad;
+  function file(bytes32 what, uint wad) external onlyOwner {
+    if (what == "fee") fee = wad;
     else revert();
   }
 
-  function request(address feed) external payable {
-    require(fees[feed] > 0, "Fees must be set");
-    require(msg.value == fees[feed], "Did not send the correct fee amount");
-    IPriceFeed(feed).requestUpdate.value(msg.value)();
-    emit Requested(feed);
+  function request() external payable {
+    require(fee > 0, "Fee not set");
+    require(msg.value == fee, "Did not send the correct fee");
+    IPriceFeed(oracle).requestUpdate.value(fee)();
+    emit Requested(oracle);
   }
 
-  function complete(address feed) external {
-    require(fees[feed] > 0, "Fees must be set");
-    IPriceFeed(feed).completeUpdate();
-    emit Completed(feed);
+  function complete() external {
+    IPriceFeed(oracle).completeUpdate();
+    emit Completed(oracle);
   }
 
   function update(address derive) external onlyOwner {
-    require(feeds[derive] != address(0), "The feed for this contract must be set");
-    int128 price = IPriceFeed(feeds[derive]).price();
+    int128 price = IPriceFeed(oracle).priceFeed(feeds[derive]);
     require(price > 0, "The price must be positive");
     IDeriveContractDPX(derive).oracleCallBack(uint(price));
-    emit Updated(price);
+    emit Updated(derive, price);
   }
 
 }

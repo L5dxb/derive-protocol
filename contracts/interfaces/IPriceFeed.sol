@@ -4,6 +4,6 @@ contract IPriceFeed {
 
   function requestUpdate() public payable;
   function completeUpdate() public payable;
-  function price() public view returns (int128);
+  function priceFeed(uint position) public view returns (int128);
 
 }

@@ -6,6 +6,7 @@ const DeriveContractFactory = artifacts.require('DeriveContractFactoryDPX.sol');
 const DeriveCollateralPool = artifacts.require('DeriveCollateralPool.sol');
 const DeriveContractRegistry = artifacts.require('DeriveContractRegistry.sol');
 const OracleHub = artifacts.require('OracleHub.sol');
+const MockPriceFeed = artifacts.require('MockPriceFeed.sol');
 
 module.exports = async function(deployer, network, accounts) {
 
@@ -15,6 +16,7 @@ module.exports = async function(deployer, network, accounts) {
   var localCollateralToken1, localCollateralToken2;
   var oracleHub;
   var marketContractFactory, marketContractRegistry;
+  var priceFeed;
 
   var collateralTokens = [
     "",
@@ -38,16 +40,18 @@ module.exports = async function(deployer, network, accounts) {
     collateralTokens[0] = localCollateralToken1.address;
     collateralTokens[1] = localCollateralToken2.address;
 
-  }
+    priceFeed = await deployer.deploy(MockPriceFeed);
 
-  oracleHub = await deployer.deploy(OracleHub);
+  } else {}
+
+  oracleHub = await deployer.deploy(OracleHub, priceFeed.address);
 
   marketContractFactory = await deployer.deploy(DeriveContractFactory, DeriveContractRegistry.address, collateralPool.address, oracleHub.address)
   marketContractRegistry = await DeriveContractRegistry.deployed();
 
   await marketContractRegistry.addFactoryAddress(marketContractFactory.address)
 
-  await marketContractFactory.deployDeriveContractDPX(
+  var firstDPX = await marketContractFactory.deployDeriveContractDPX(
     [
       web3.utils.asciiToHex('DING', 32),
       web3.utils.asciiToHex('LDING', 32),
@@ -55,17 +59,17 @@ module.exports = async function(deployer, network, accounts) {
     ],
     collateralTokens[0],
     [
-      20000000000000,
-      60000000000000,
+      "900000000000000000",
+      "1050000000000000000",
       18,
       100000000,
       marketContractExpiration
     ],
-    'api.coincap.io/v2/rates/ding',
+    'api.coincap.io/v2/rates/usdc',
     'rateUsd'
   )
 
-  await marketContractFactory.deployDeriveContractDPX(
+  var secondDPX = await marketContractFactory.deployDeriveContractDPX(
     [
       web3.utils.asciiToHex('ETH', 32),
       web3.utils.asciiToHex('LETH', 32),
@@ -73,8 +77,8 @@ module.exports = async function(deployer, network, accounts) {
     ],
     collateralTokens[1],
     [
-      20000000000000,
-      60000000000000,
+      "170820000000000000000",
+      "204820000000000000000",
       18,
       100000000,
       marketContractExpiration
@@ -82,6 +86,25 @@ module.exports = async function(deployer, network, accounts) {
     'api.coincap.io/v2/rates/ethereum',
     'rateUsd'
   );
+
+  //Setup oracle hub
+
+  await oracleHub.file(
+    web3.utils.asciiToHex('feeds', 32),
+    firstDPX.receipt.logs[4].args[1],
+    0
+  )
+
+  await oracleHub.file(
+    web3.utils.asciiToHex('feeds', 32),
+    secondDPX.receipt.logs[4].args[1],
+    1
+  )
+
+  await oracleHub.file(
+    web3.utils.asciiToHex('fee', 32),
+    "2006000000000000"
+  )
 
   }); }); }); }); }); });
 
