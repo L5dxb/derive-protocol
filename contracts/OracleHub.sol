@@ -11,8 +11,8 @@ contract OracleHub is Ownable {
   event Completed(address feed);
   event Updated(address derive, int128 price);
 
-  address oracle;
-  uint256 fee;
+  address public oracle;
+  uint256 public fee;
 
   mapping(address => uint256) public feeds;
 
