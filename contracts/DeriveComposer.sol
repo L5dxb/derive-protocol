@@ -55,8 +55,13 @@ contract DeriveComposer is Ownable {
     INeutralJoin(neutrals[position]).exit(custodian, wad);
 
     uint gem = vat.gem(INeutralJoin(neutrals[position]).ilk(), custodian);
+    uint dec = INeutralJoin(neutrals[position]).dec();
 
     if (gem > 0) {
+      if (dec < 18) {
+        gem = gem / ( 10**(18 - dec) );
+      }
+
       require(gem / IDeriveContract(position).COLLATERAL_PER_UNIT() > 0 &&
               gem % IDeriveContract(position).COLLATERAL_PER_UNIT() == 0,
         "Not enough neutral left to exit next time");

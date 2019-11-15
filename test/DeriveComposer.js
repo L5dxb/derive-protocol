@@ -149,7 +149,7 @@ contract('DeriveComposer', function(accounts) {
 
     join2Contract = new web3.eth.Contract(
 
-      NeutralJoin1.abi,
+      NeutralJoin2.abi,
       join2.address,
 
       {from: accounts[0]}
@@ -158,7 +158,7 @@ contract('DeriveComposer', function(accounts) {
 
   })
 
-  it('should have correctly set up the contracts', async function() {
+  it('should have correctly set up the first join contracts', async function() {
     var whitelisting = await composerContract.methods.whitelisted(derive1.address).call()
     var neutral = await composerContract.methods.neutrals(derive1.address).call()
 
@@ -182,7 +182,31 @@ contract('DeriveComposer', function(accounts) {
     assert(setJem.toString() == collateralToken1.address)
   })
 
-  it('should join position tokens into a neutral if all conditions are met', async function() {
+  it('should have correctly set up the second join contracts', async function() {
+    var whitelisting = await composerContract.methods.whitelisted(derive2.address).call()
+    var neutral = await composerContract.methods.neutrals(derive2.address).call()
+
+    var setVat = await join2Contract.methods.vat().call()
+    var setIlk= await join2Contract.methods.ilk().call()
+    var setCom = await join2Contract.methods.com().call()
+    var setDec = await join2Contract.methods.dec().call()
+    var setJem = await join2Contract.methods.gem().call()
+
+    var longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+    var shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+
+    assert(longBalance == 12)
+    assert(shortBalance == 12)
+    assert(whitelisting.toString() == "true");
+    assert(neutral.toString() == join2.address);
+    assert(setVat.toString() == vat.address);
+    assert(setIlk.toString() == "0x4450555344430000000000000000000000000000000000000000000000000000");
+    assert(setCom.toString() == composer.address);
+    assert(setDec.toString() == 6);
+    assert(setJem.toString() == collateralToken2.address)
+  })
+
+  it('(JOIN 1) should join position tokens into a neutral if all conditions are met', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -204,7 +228,29 @@ contract('DeriveComposer', function(accounts) {
     assert(vatGem == 1800)
   })
 
-  it('should exit all positions if all conditions are met', async function() {
+  it('(JOIN 2) should join position tokens into a neutral if all conditions are met', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    var longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+    var shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+
+    assert(longBalance == 6)
+    assert(shortBalance == 6)
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(composer.address).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(composer.address).call();
+
+    assert(longBalance == 6)
+    assert(shortBalance == 6)
+
+    var vatGem = await vatContract.methods.gem(web3.utils.asciiToHex('DPUSDC', 32), accounts[1]).call()
+
+    assert(vatGem == 1800000000000000)
+  })
+
+  it('(JOIN 1) should exit all positions if all conditions are met', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -228,7 +274,31 @@ contract('DeriveComposer', function(accounts) {
     assert(vatGem == 0)
   })
 
-  it('should progressively exit positions if all conditions are met', async function() {
+  it('(JOIN 2) should exit all positions if all conditions are met', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    await composer.exit(accounts[1], derive2.address, "1800", {from: accounts[1]})
+
+    var longBalance = await longPositionTokensContract2.methods.balanceOf(composer.address).call();
+    var shortBalance = await shortPositionTokensContract2.methods.balanceOf(composer.address).call();
+
+    assert(longBalance == 0)
+    assert(shortBalance == 0)
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+
+    assert(longBalance == 12)
+    assert(shortBalance == 12)
+
+    var vatGem = await vatContract.methods.gem(web3.utils.asciiToHex('DPUSDC', 32), accounts[1]).call()
+
+    assert(vatGem == 0)
+  })
+
+  it('(JOIN 1) should progressively exit positions if all conditions are met', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -262,7 +332,41 @@ contract('DeriveComposer', function(accounts) {
     assert(shortBalance == 12)
   })
 
-  it('should fail if a part exit is not valid', async function() {
+  it('(JOIN 2) should progressively exit positions if all conditions are met', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    await composer.exit(accounts[1], derive2.address, "1200", {from: accounts[1]})
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(composer.address).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(composer.address).call();
+
+    assert(longBalance == 2)
+    assert(shortBalance == 2)
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+
+    assert(longBalance == 10)
+    assert(shortBalance == 10)
+
+    await composer.exit(accounts[1], derive2.address, "600", {from: accounts[1]})
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(composer.address).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(composer.address).call();
+
+    assert(longBalance == 0)
+    assert(shortBalance == 0)
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[1]).call();
+
+    assert(longBalance == 12)
+    assert(shortBalance == 12)
+  })
+
+  it('(JOIN 1) should fail if a part exit is not valid', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -313,7 +417,58 @@ contract('DeriveComposer', function(accounts) {
 
   })
 
-  it('should be able to exit after part of the gem was moved', async function() {
+  it('(JOIN 2) should fail if a part exit is not valid', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    var err;
+
+    try {
+
+      await composer.exit(accounts[1], derive2.address, "1250", {from: accounts[1]})
+
+    } catch(error) {
+
+      err = error;
+
+    }
+
+    assert(err != undefined, "Could exit an invalid amount");
+
+    err = undefined;
+
+    try {
+
+      await composer.exit(accounts[1], derive2.address, "1700", {from: accounts[1]})
+
+    } catch(error) {
+
+      err = error;
+
+    }
+
+    assert(err != undefined, "Could exit an invalid amount");
+
+    err = undefined;
+
+    await composer.exit(accounts[1], derive2.address, "900", {from: accounts[1]})
+
+    try {
+
+      await composer.exit(accounts[1], derive2.address, "400", {from: accounts[1]})
+
+    } catch(error) {
+
+      err = error;
+
+    }
+
+    assert(err != undefined, "Could exit an invalid amount");
+
+  })
+
+  it('(JOIN 1) should be able to exit after part of the gem was moved', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -335,7 +490,29 @@ contract('DeriveComposer', function(accounts) {
     assert(shortBalance == 3)
   })
 
-  it('should not exit if the caller is not valid', async function() {
+  it('(JOIN 2) should be able to exit after part of the gem was moved', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    await vat.move(web3.utils.asciiToHex('DPUSDC', 32), accounts[2], 900000000000000, {from: accounts[1]})
+
+    await composer.exit(accounts[2], derive2.address, "900", {from: accounts[2]});
+
+    var longBalance = await longPositionTokensContract2.methods.balanceOf(composer.address).call();
+    var shortBalance = await shortPositionTokensContract2.methods.balanceOf(composer.address).call();
+
+    assert(longBalance == 3)
+    assert(shortBalance == 3)
+
+    longBalance = await longPositionTokensContract2.methods.balanceOf(accounts[2]).call();
+    shortBalance = await shortPositionTokensContract2.methods.balanceOf(accounts[2]).call();
+
+    assert(longBalance == 3)
+    assert(shortBalance == 3)
+  })
+
+  it('(JOIN 1) should not exit if the caller is not valid', async function() {
     await longPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await shortPositionTokens1.approve(composer.address, "-1", {from: accounts[1]})
     await composer.join(accounts[1], derive1.address, 6, {from: accounts[1]})
@@ -361,6 +538,42 @@ contract('DeriveComposer', function(accounts) {
     try {
 
       await composer.exit(accounts[2], derive1.address, "900", {from: accounts[1]})
+
+    } catch(error) {
+
+      err = error;
+
+    }
+
+    assert(err != undefined);
+  })
+
+  it('(JOIN 2) should not exit if the caller is not valid', async function() {
+    await longPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await shortPositionTokens2.approve(composer.address, "-1", {from: accounts[1]})
+    await composer.join(accounts[1], derive2.address, 6, {from: accounts[1]})
+
+    var err;
+
+    try {
+
+      await composer.exit(accounts[1], derive2.address, "900", {from: accounts[2]})
+
+    } catch(error) {
+
+      err = error;
+
+    }
+
+    assert(err != undefined);
+
+    err = undefined;
+
+    await vat.move(web3.utils.asciiToHex('DPUSDC', 32), accounts[2], 900000000000000, {from: accounts[1]})
+
+    try {
+
+      await composer.exit(accounts[2], derive2.address, "900", {from: accounts[1]})
 
     } catch(error) {
 

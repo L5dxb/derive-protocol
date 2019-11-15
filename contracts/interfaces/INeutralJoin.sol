@@ -6,5 +6,6 @@ contract INeutralJoin {
   function ilk() public view returns (bytes32);
   function join(address usr, uint wad) public;
   function exit(address usr, uint wad) public;
+  function dec() public view returns (uint);
 
 }

@@ -4,9 +4,12 @@ const CollateralToken = artifacts.require('CollateralToken.sol');
 const DeriveContractDPX = artifacts.require('DeriveContractDPX.sol');
 const DeriveContractFactory = artifacts.require('DeriveContractFactoryDPX.sol');
 const DeriveCollateralPool = artifacts.require('DeriveCollateralPool.sol');
+const DeriveComposer = artifacts.require('DeriveComposer');
+const Vat = artifacts.require('Vat');
 const DeriveContractRegistry = artifacts.require('DeriveContractRegistry.sol');
 const OracleHub = artifacts.require('OracleHub.sol');
 const MockPriceFeed = artifacts.require('MockPriceFeed.sol');
+const NeutralJoin1 = artifacts.require('NeutralJoin1');
 
 module.exports = async function(deployer, network, accounts) {
 
@@ -17,11 +20,17 @@ module.exports = async function(deployer, network, accounts) {
   var oracleHub;
   var marketContractFactory, marketContractRegistry;
   var priceFeed;
+  var join1;
+  var composer;
 
   var collateralTokens = [
     "",
     ""
   ]
+
+  var vat = "";
+
+  var ilk1 = web3.utils.asciiToHex('DPBUSD', 32);
 
   await deployer.deploy(StringLib).then(async function() {
   await deployer.deploy(MathLib).then(async function() {
@@ -34,8 +43,11 @@ module.exports = async function(deployer, network, accounts) {
 
   if (network != 'live') {
 
-    localCollateralToken1 = await deployer.deploy(CollateralToken, 'CollateralToken1', 'CTK1', 10000, 18);
-    localCollateralToken2 = await deployer.deploy(CollateralToken, 'CollateralToken2', 'CTK2', 10000, 18);
+    vat = await deployer.deploy(Vat);
+    vat = vat.address;
+
+    localCollateralToken1 = await deployer.deploy(CollateralToken, 'Binance USD', 'BUSD', 10000, 18);
+    localCollateralToken2 = await deployer.deploy(CollateralToken, 'Ding Stablecoin', 'DING', 10000, 18);
 
     collateralTokens[0] = localCollateralToken1.address;
     collateralTokens[1] = localCollateralToken2.address;
@@ -44,7 +56,9 @@ module.exports = async function(deployer, network, accounts) {
 
   } else {}
 
+  composer = await deployer.deploy(DeriveComposer, vat);
   oracleHub = await deployer.deploy(OracleHub, priceFeed.address);
+  join1 = await deployer.deploy(NeutralJoin1, vat, ilk1, composer.address, collateralTokens[0]);
 
   marketContractFactory = await deployer.deploy(DeriveContractFactory, DeriveContractRegistry.address, collateralPool.address, oracleHub.address)
   marketContractRegistry = await DeriveContractRegistry.deployed();

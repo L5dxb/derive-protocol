@@ -55,6 +55,6 @@ contract NeutralJoin2 is MinterRole, Ownable {
     function exit(address usr, uint wad) public note onlyMinter {
         uint amount18 = mul(wad, 10 ** (18 - dec));
         require(amount18 <= 2 ** 255, "NeutralJoin2/overflow");
-        vat.slip(ilk, msg.sender, -int(amount18));
+        vat.slip(ilk, usr, -int(amount18));
     }
 }
