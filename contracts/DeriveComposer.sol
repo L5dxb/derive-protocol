@@ -6,26 +6,29 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./interfaces/INeutralJoin.sol";
 import "./interfaces/IDeriveContract.sol";
 import "./libraries/MathLib.sol";
+import "./interfaces/VatLike.sol";
 
 contract DeriveComposer is Ownable {
 
   using SafeMath for uint;
 
-  event Joined(address sender, address positions, uint derivative, uint minted);
-  event Exited(address sender, address positions, uint derivative, uint minted);
+  event Joined(address sender, address custodian, address positions, uint derivative, uint minted);
+  event Exited(address sender, address custodian, address positions, uint derivative, uint minted);
 
   uint256 public live;
+  VatLike public vat;
 
-  mapping(address => bool)                        public whitelisted;
-  mapping(address => address)                     public neutrals;
-  mapping(address => mapping(address => uint256)) public contributions;
-  mapping(address => mapping(address => uint256)) public minted;
+  mapping(address => bool)                     public whitelisted;
+  mapping(address => address)                  public neutrals;
+  mapping(address => mapping(address => bool)) public custodians;
 
-  constructor() public {
+  constructor(address vat_) public {
+    require(vat_ != address(0));
     live = 1;
+    vat = VatLike(vat_);
   }
 
-  function join(address position, uint wad) external {
+  function join(address custodian, address position, uint wad) external {
     require(live == 1, "Contract is not live");
     require(whitelisted[position] == true, "This position contract is not whitelisted");
     require(neutrals[position] != address(0), "Neutral not set");
@@ -33,32 +36,40 @@ contract DeriveComposer is Ownable {
     require(IDeriveContract(position).isSettled() == false, "Contract already settled");
     require(IERC20(IDeriveContract(position).LONG_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
     require(IERC20(IDeriveContract(position).SHORT_POSITION_TOKEN()).transferFrom(msg.sender, address(this), wad) == true);
+    require(custodian != address(0), "Custodian cannot be null");
+
+    custodians[msg.sender][custodian] = true;
 
     uint toMint = MathLib.multiply(wad, IDeriveContract(position).COLLATERAL_PER_UNIT());
 
-    contributions[msg.sender][neutrals[position]] = contributions[msg.sender][neutrals[position]].add(wad);
-    minted[msg.sender][neutrals[position]] = minted[msg.sender][neutrals[position]].add(toMint);
+    INeutralJoin(neutrals[position]).join(custodian, toMint);
 
-    require(INeutralJoin(neutrals[position]).mint(msg.sender, toMint) == true, "Could not mint");
-
-    emit Joined(msg.sender, position, wad, toMint);
+    emit Joined(msg.sender, custodian, position, wad, toMint);
   }
 
-  function exit(address position, uint wad) external {
+  function exit(address custodian, address position, uint wad) external {
     require(neutrals[position] != address(0), "Neutral not set");
-    require(INeutralJoin(neutrals[position]).burn(msg.sender, wad) == true, "Could not burn");
+    require(custodian != address(0), "Custodian cannot be null");
+    require(custodians[msg.sender][custodian] == true || custodian == msg.sender, "Not your custodian");
+
+    INeutralJoin(neutrals[position]).exit(custodian, wad);
+
+    uint gem = vat.gem(INeutralJoin(neutrals[position]).ilk(), custodian);
+
+    if (gem > 0) {
+      require(gem / IDeriveContract(position).COLLATERAL_PER_UNIT() > 0 &&
+              gem % IDeriveContract(position).COLLATERAL_PER_UNIT() == 0,
+        "Not enough neutral left to exit next time");
+    }
 
     uint toFree = wad / IDeriveContract(position).COLLATERAL_PER_UNIT();
 
     require(toFree > 0, "Nothing to free");
 
-    contributions[msg.sender][neutrals[position]] = contributions[msg.sender][neutrals[position]].sub(toFree);
-    minted[msg.sender][neutrals[position]] = minted[msg.sender][neutrals[position]].sub(wad);
-
     require(IERC20(IDeriveContract(position).LONG_POSITION_TOKEN()).transfer(msg.sender, toFree) == true);
     require(IERC20(IDeriveContract(position).SHORT_POSITION_TOKEN()).transfer(msg.sender, toFree) == true);
 
-    emit Exited(msg.sender, position, toFree, wad);
+    emit Exited(msg.sender, custodian, position, toFree, wad);
   }
 
   //OWNER

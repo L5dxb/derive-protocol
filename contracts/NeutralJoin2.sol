@@ -14,9 +14,6 @@ contract NeutralJoin2 is MinterRole, Ownable {
     uint            public dec;
     address         public gem;
 
-    mapping(address => uint256) public lock;
-    mapping(address => uint256) public balances;
-
     modifier note {
         _;
         assembly {
@@ -49,28 +46,15 @@ contract NeutralJoin2 is MinterRole, Ownable {
         require(y == 0 || (z = x * y) / y == x, "NeutralJoin2/overflow");
     }
 
-    function mint(address account, uint256 amount) public onlyMinter returns (bool) {
-        uint amount18 = mul(amount, 10 ** (18 - dec));
+    function join(address usr, uint wad) public note onlyMinter {
+        uint amount18 = mul(wad, 10 ** (18 - dec));
+        require(amount18 >= 0, "NeutralJoin2/overflow");
+        vat.slip(ilk, usr, int(amount18));
+    }
+
+    function exit(address usr, uint wad) public note onlyMinter {
+        uint amount18 = mul(wad, 10 ** (18 - dec));
         require(amount18 <= 2 ** 255, "NeutralJoin2/overflow");
-        balances[account] = balances[account].add(amount18);
-        return true;
-    }
-
-    function burn(address account, uint256 amount) public onlyMinter returns (bool) {
-        require(balances[account].sub(amount) >= lock[account], "NeutralJoin2/too-many-locked-tokens");
-        balances[account] = balances[account].sub(amount);
-    }
-
-    function join(address usr, uint wad) public note {
-        require(int(wad) >= 0, "NeutralJoin2/overflow");
-        require(lock[msg.sender].add(wad) <= balances[msg.sender], "NeutralJoin2/not-enough-free-tokens");
-        lock[msg.sender] = lock[msg.sender].add(wad);
-        vat.slip(ilk, usr, int(wad));
-    }
-
-    function exit(address usr, uint wad) public note {
-        require(wad <= 2 ** 255, "NeutralJoin2/overflow");
-        lock[msg.sender] = lock[msg.sender].sub(wad);
-        vat.slip(ilk, msg.sender, -int(wad));
+        vat.slip(ilk, msg.sender, -int(amount18));
     }
 }

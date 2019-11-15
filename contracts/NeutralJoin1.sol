@@ -14,9 +14,6 @@ contract NeutralJoin1 is MinterRole, Ownable {
     uint            public dec;
     address         public gem;
 
-    mapping(address => uint256) public lock;
-    mapping(address => uint256) public balances;
-
     modifier note {
         _;
         assembly {
@@ -45,27 +42,13 @@ contract NeutralJoin1 is MinterRole, Ownable {
         _addMinter(com_);
     }
 
-    function mint(address account, uint256 amount) public onlyMinter returns (bool) {
-        balances[account] = balances[account].add(amount);
-        return true;
-    }
-
-    function burn(address account, uint256 amount) public onlyMinter returns (bool) {
-        require(balances[account].sub(amount) >= lock[account], "NeutralJoin/too-many-locked-tokens");
-        balances[account] = balances[account].sub(amount);
-        return true;
-    }
-
-    function join(address usr, uint wad) public note {
+    function join(address usr, uint wad) public note onlyMinter {
         require(int(wad) >= 0, "NeutralJoin/overflow");
-        require(lock[msg.sender].add(wad) <= balances[msg.sender], "NeutralJoin/not-enough-free-tokens");
-        lock[msg.sender] = lock[msg.sender].add(wad);
         vat.slip(ilk, usr, int(wad));
     }
 
-    function exit(address usr, uint wad) public note {
+    function exit(address usr, uint wad) public note onlyMinter {
         require(wad <= 2 ** 255, "NeutralJoin/overflow");
-        lock[msg.sender] = lock[msg.sender].sub(wad);
-        vat.slip(ilk, msg.sender, -int(wad));
+        vat.slip(ilk, usr, -int(wad));
     }
 }
