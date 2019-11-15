@@ -73,4 +73,25 @@ contract('OracleHub', async function (accounts) {
     assert(setFeed.toString() == "1")
   })
 
+  it('should update prices in the feed', async function() {
+    await oracleHub.file(web3.utils.asciiToHex('feeds', 32), derive.address, 1);
+    await oracleHub.file(web3.utils.asciiToHex('fee', 32), "2006000000000000");
+
+    await oracleHub.request({from: accounts[0], value: "2006000000000000"})
+    await oracleHub.complete()
+
+    var priceOne = await priceFeedContract.methods.priceFeed(0).call();
+    var priceTwo = await priceFeedContract.methods.priceFeed(1).call();
+
+    assert(priceOne == "990000000000000000")
+    assert(priceTwo == "187320000000000000000")
+  })
+
+  it('should update the price in a derive contract', async function() {
+    await oracleHub.file(web3.utils.asciiToHex('feeds', 32), derive.address, 1);
+    await oracleHub.update(derive.address);
+    var deriveContractLastPrice = await deriveContract.methods.lastPrice().call();
+    assert(deriveContractLastPrice.toString() == "187320000000000000000");
+  })
+
 })

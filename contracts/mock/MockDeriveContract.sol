@@ -4,8 +4,8 @@ contract MockDeriveContract {
 
   event UpdatedLastPrice(uint256 price);
 
-  address oracleHub;
-  uint256 lastPrice;
+  address public oracleHub;
+  uint256 public lastPrice;
 
   modifier onlyOracleHub() {
     require(msg.sender == oracleHub);

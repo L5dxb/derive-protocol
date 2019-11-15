@@ -46,10 +46,11 @@ contract DeriveComposer is Ownable {
 
   function exit(address position, uint wad) external {
     require(neutrals[position] != address(0), "Neutral not set");
-
     require(INeutralJoin(neutrals[position]).burn(msg.sender, wad) == true, "Could not burn");
 
     uint toFree = wad / IDeriveContract(position).COLLATERAL_PER_UNIT();
+
+    require(toFree > 0, "Nothing to free");
 
     contributions[msg.sender][neutrals[position]] = contributions[msg.sender][neutrals[position]].sub(toFree);
     minted[msg.sender][neutrals[position]] = minted[msg.sender][neutrals[position]].sub(wad);
@@ -62,8 +63,8 @@ contract DeriveComposer is Ownable {
 
   //OWNER
 
-  function file(bytes32 what, address who, bool wad) external onlyOwner {
-    if (what == "whitelisted") whitelisted[who] = wad;
+  function file(bytes32 what, address who) external onlyOwner {
+    if (what == "whitelisted") whitelisted[who] = !whitelisted[who];
     else revert();
   }
 
