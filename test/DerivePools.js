@@ -139,6 +139,31 @@ contract('DeriveComposer', function(accounts) {
       true
     );
 
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString())
+
+    var longInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+    var shortInternalBalance = await poolsContract.methods.balances(accounts[2], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+
+    assert(longInternalBalance.toString() == shortInternalBalance.toString())
+    assert(longInternalBalance.toString() == "10")
+
+    var longCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+    var shortCooldown = await poolsContract.methods.cooldown(accounts[2], web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(longCooldown.toString() == shortCooldown.toString())
+    assert(longCooldown.toString() != "0")
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "3000")
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "3000")
+
   })
 
 })

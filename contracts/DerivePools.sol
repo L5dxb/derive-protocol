@@ -55,7 +55,7 @@ contract DerivePools {
 
   uint public wait;
 
-  mapping(bytes32 => Neutral)                                      neutrals;
+  mapping(bytes32 => Neutral)                                      public neutrals;
   mapping(address => mapping(bytes32 => mapping(address => uint))) public balances;
   mapping(address => uint256)                                      public nonce;
   mapping(address => mapping(bytes32 => uint))                     public cooldown;
@@ -220,8 +220,6 @@ contract DerivePools {
     require(getSigner(_hash, buySig) == buyer, "Pools/invalid-signer");
 
     if (way) {
-      // IERC20(buy).approve(buyer, 0);
-      // IERC20(buy).approve(buyer, amount);
       transferFrom(buy, buyer, amount);
     } else {
       transfer(buy, buyer, amount);
@@ -237,8 +235,6 @@ contract DerivePools {
     require(getSigner(_hash, sellSig) == seller, "Pools/invalid-signer");
 
     if (way) {
-      // IERC20(sell).approve(seller, 0);
-      // IERC20(sell).approve(seller, amount);
       transferFrom(sell, seller, amount);
     } else {
       transfer(sell, seller, amount);
@@ -290,18 +286,11 @@ contract DerivePools {
     require(getSigner(_hash, joinSig) == joiner, "Pools/invalid-signer");
     transferFrom(party, joiner, amount);
 
-    // require(executeCall(party, 0, data), "Pools/could-not-join");
-
     data = getData(bytes32("transferFrom"), exiter, amount);
 
     _hash = getHash(exiter, party, 0, data);
     require(getSigner(_hash, exitSig) == exiter, "Pools/invalid-signer");
     transfer(party, exiter, amount);
-
-    // IERC20(party).approve(exiter, 0);
-    // IERC20(party).approve(exiter, amount);
-    //
-    // require(executeCall(party, 0, data), "Pools/could-not-join");
 
     require(current == IERC20(party).balanceOf(address(this)), "Pool/different-balance");
 
