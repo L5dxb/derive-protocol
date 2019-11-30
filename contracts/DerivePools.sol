@@ -118,8 +118,8 @@ contract DerivePools {
   ) external auth {
     require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
-    require(now <= cooldown[buyer][neutral], "Pools/buyer-must-wait");
-    require(now <= cooldown[seller][neutral], "Pools/seller-must-wait");
+    require(cooldown[buyer][neutral] == 0 || now <= cooldown[buyer][neutral], "Pools/buyer-must-wait");
+    require(cooldown[seller][neutral] == 0 || now <= cooldown[seller][neutral], "Pools/seller-must-wait");
 
     uint currentBuy = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this));
     uint currentSell = IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this));
@@ -140,7 +140,7 @@ contract DerivePools {
     if (way) {
       require(IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)) == currentBuy.add(amount), "Pools/incorrect-internal-balance");
     } else {
-      require(IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)) == currentBuy.sub(amount), "Pools/incorrect-internal-balance");
+      require(IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this)) == currentBuy.sub(amount), "Pools/incorrect-internal-balance");
     }
 
     flow(
@@ -211,28 +211,38 @@ contract DerivePools {
     bytes32 _hash;
 
     if (way)
-      data = abi.encodeWithSignature("transfer", address(this), amount);
+      data = getData(bytes32("transfer"), address(0), amount);
     else {
-      data = abi.encodeWithSignature("transferFrom", address(this), buyer, amount);
-      IERC20(buy).approve(buyer, 0);
-      IERC20(buy).approve(buyer, amount);
+      data = getData(bytes32("transferFrom"), buyer, amount);
     }
 
     _hash = getHash(buyer, buy, 0, data);
     require(getSigner(_hash, buySig) == buyer, "Pools/invalid-signer");
-    require(executeCall(buy, 0, data), "Pools/could-not-join");
+
+    if (way) {
+      // IERC20(buy).approve(buyer, 0);
+      // IERC20(buy).approve(buyer, amount);
+      transferFrom(buy, buyer, amount);
+    } else {
+      transfer(buy, buyer, amount);
+    }
 
     if (way)
-      data = abi.encodeWithSignature("transfer", address(this), amount);
+      data = getData(bytes32("transfer"), address(0), amount);
     else {
-      data = abi.encodeWithSignature("transferFrom", address(this), seller, amount);
-      IERC20(sell).approve(seller, 0);
-      IERC20(sell).approve(seller, amount);
+      data = getData(bytes32("transferFrom"), seller, amount);
     }
 
     _hash = getHash(seller, sell, 0, data);
     require(getSigner(_hash, sellSig) == seller, "Pools/invalid-signer");
-    require(executeCall(sell, 0, data), "Pools/could-not-join");
+
+    if (way) {
+      // IERC20(sell).approve(seller, 0);
+      // IERC20(sell).approve(seller, amount);
+      transferFrom(sell, seller, amount);
+    } else {
+      transfer(sell, seller, amount);
+    }
 
     nonce[buyer]++;
     nonce[seller]++;
@@ -255,8 +265,8 @@ contract DerivePools {
     require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
     require(neutrals[neutral].matched >= amount, "Pools/margin-too-small");
-    require(now <= cooldown[exiter][neutral], "Pools/exiter-must-wait");
-    require(now <= cooldown[joiner][neutral], "Pools/joiner-must-wait");
+    require(cooldown[exiter][neutral] == 0 || now <= cooldown[exiter][neutral], "Pools/exiter-must-wait");
+    require(cooldown[joiner][neutral] == 0 || now <= cooldown[joiner][neutral], "Pools/joiner-must-wait");
 
     cooldown[exiter][neutral] = cooldown[exiter][neutral].add(wait);
     cooldown[joiner][neutral] = cooldown[joiner][neutral].add(wait);
@@ -273,21 +283,25 @@ contract DerivePools {
 
     uint current = IERC20(party).balanceOf(address(this));
 
-    bytes memory data = abi.encodeWithSignature("transfer", address(this), amount);
+    bytes memory data = getData(bytes32("transfer"), address(0), amount);
     bytes32 _hash;
 
     _hash = getHash(joiner, party, 0, data);
     require(getSigner(_hash, joinSig) == joiner, "Pools/invalid-signer");
-    require(executeCall(party, 0, data), "Pools/could-not-join");
+    transferFrom(party, joiner, amount);
 
-    data = abi.encodeWithSignature("transferFrom", address(this), exiter, amount);
+    // require(executeCall(party, 0, data), "Pools/could-not-join");
+
+    data = getData(bytes32("transferFrom"), exiter, amount);
+
     _hash = getHash(exiter, party, 0, data);
     require(getSigner(_hash, exitSig) == exiter, "Pools/invalid-signer");
+    transfer(party, exiter, amount);
 
-    IERC20(party).approve(exiter, 0);
-    IERC20(party).approve(exiter, amount);
-
-    require(executeCall(party, 0, data), "Pools/could-not-join");
+    // IERC20(party).approve(exiter, 0);
+    // IERC20(party).approve(exiter, amount);
+    //
+    // require(executeCall(party, 0, data), "Pools/could-not-join");
 
     require(current == IERC20(party).balanceOf(address(this)), "Pool/different-balance");
 
@@ -306,14 +320,30 @@ contract DerivePools {
 
   }
 
+  function transferFrom(address token, address from, uint amount) internal {
+    IERC20(token).transferFrom(from, address(this), amount);
+  }
+
+  function transfer(address token, address to, uint amount) internal {
+    IERC20(token).transfer(to, amount);
+  }
+
   function executeCall(address to, uint256 value, bytes memory data) internal returns (bool success) {
     assembly {
        success := call(gas, to, value, add(data, 0x20), mload(data), 0, 0)
     }
   }
 
+  function getData(bytes32 transferType, address to, uint256 amount) public returns (bytes memory) {
+    if (transferType == "transfer") {
+      return abi.encodeWithSignature("transfer(address,uint256)", address(this), amount);
+    } else if (transferType == "transferFrom") {
+      return abi.encodeWithSignature("transferFrom(address,address,uint256)", address(this), to, amount);
+    }
+  }
+
   function getHash(address signer, address destination, uint value, bytes memory data)
-    internal view returns (bytes32) {
+    public view returns (bytes32) {
     return keccak256(abi.encodePacked(
       address(this),
       signer,
