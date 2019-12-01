@@ -166,4 +166,182 @@ contract('DeriveComposer', function(accounts) {
 
   })
 
+  it('should exit a valid long/short pair', async function() {
+
+    await createNeutral();
+
+    var longExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[1], 10).call()
+    longExitHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longExitHash).call()
+    var longExitSignature = web3.eth.accounts.sign(longExitHash, longHolderPrivKey);
+
+    var shortExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[2], 10).call()
+    shortExitHash = await poolsContract.methods.getHash(accounts[2], shortPositionTokens.address, 0, shortExitHash).call()
+    var shortExitSignature = web3.eth.accounts.sign(shortExitHash, shortHolderPrivKey);
+
+    await pools.flip(
+      longExitSignature.signature,
+      shortExitSignature.signature,
+      accounts[1],
+      accounts[2],
+      10,
+      web3.utils.asciiToHex('DPBUSD', 32),
+      false
+    );
+
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString());
+    assert(poolsLongBalance.toString() == "0");
+
+    var longInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+    var shortInternalBalance = await poolsContract.methods.balances(accounts[2], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+
+    assert(longInternalBalance.toString() == shortInternalBalance.toString());
+    assert(longInternalBalance.toString() == "0");
+
+    var longCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+    var shortCooldown = await poolsContract.methods.cooldown(accounts[2], web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(longCooldown.toString() == shortCooldown.toString());
+    assert(longCooldown.toString() == "0");
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "0");
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "0");
+
+  })
+
+  it('should entirely swap a long position', async function() {
+
+    await createNeutral();
+
+    //Swap sigs and data
+
+    var longExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[1], 10).call()
+    longExitHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longExitHash).call()
+    var longExitSignature = web3.eth.accounts.sign(longExitHash, longHolderPrivKey);
+
+    var longNewJoinHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), accounts[2], 10).call()
+    longNewJoinHash = await poolsContract.methods.getHash(accounts[2], longPositionTokens.address, 0, longNewJoinHash).call()
+    var longNewJoinSignature = web3.eth.accounts.sign(longNewJoinHash, shortHolderPrivKey);
+
+    //Approve transfers
+    await longPositionTokens.approve(pools.address, "-1", {from: accounts[2]});
+    await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+
+    await pools.swap(
+      web3.utils.asciiToHex('DPBUSD', 32),
+      longExitSignature.signature,
+      accounts[1],
+      longNewJoinSignature.signature,
+      accounts[2],
+      10,
+      true
+    )
+
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString());
+    assert(poolsLongBalance.toString() == "10");
+
+    var longInternalBalanceExiter = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+    var longInternalBalanceJoiner = await poolsContract.methods.balances(accounts[2], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+
+    assert(longInternalBalanceJoiner.toString() == '10');
+    assert(longInternalBalanceExiter.toString() == "0");
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "3000");
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "3000");
+
+  })
+
+  it('should entirely swap a short position', async function() {
+
+    await createNeutral();
+
+    //Swap sigs and data
+
+    var shortExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[2], 10).call()
+    shortExitHash = await poolsContract.methods.getHash(accounts[2], shortPositionTokens.address, 0, shortExitHash).call()
+    var shortExitSignature = web3.eth.accounts.sign(shortExitHash, shortHolderPrivKey);
+
+    var shortNewJoinHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), accounts[1], 10).call()
+    shortNewJoinHash = await poolsContract.methods.getHash(accounts[1], shortPositionTokens.address, 0, shortNewJoinHash).call()
+    var shortNewJoinSignature = web3.eth.accounts.sign(shortNewJoinHash, longHolderPrivKey);
+
+    //Approve transfers
+    await longPositionTokens.approve(pools.address, "-1", {from: accounts[2]});
+    await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+
+    await pools.swap(
+      web3.utils.asciiToHex('DPBUSD', 32),
+      shortExitSignature.signature,
+      accounts[2],
+      shortNewJoinSignature.signature,
+      accounts[1],
+      10,
+      false
+    )
+
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString());
+    assert(poolsLongBalance.toString() == "10");
+
+    var shortInternalBalanceJoiner = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+    var shortInternalBalanceExiter = await poolsContract.methods.balances(accounts[2], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+
+    assert(shortInternalBalanceJoiner.toString() == '10');
+    assert(shortInternalBalanceExiter.toString() == "0");
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "3000");
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "3000");
+
+  })
+
+  async function createNeutral() {
+    await pools.file(0);
+
+    //Create long signature and hash
+    var longJoinHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    longJoinHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longJoinHash).call()
+    var longJoinSignature = web3.eth.accounts.sign(longJoinHash, longHolderPrivKey);
+
+    //Create short signature and hash
+    var shortJoinHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    shortJoinHash = await poolsContract.methods.getHash(accounts[2], shortPositionTokens.address, 0, shortJoinHash).call()
+    var shortJoinSignature = web3.eth.accounts.sign(shortJoinHash, shortHolderPrivKey);
+
+    //Approve transfers
+    await longPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+    await shortPositionTokens.approve(pools.address, "-1", {from: accounts[2]});
+
+    await pools.flip(
+      longJoinSignature.signature,
+      shortJoinSignature.signature,
+      accounts[1],
+      accounts[2],
+      10,
+      web3.utils.asciiToHex('DPBUSD', 32),
+      true
+    );
+  }
+
 })

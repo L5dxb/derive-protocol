@@ -186,7 +186,7 @@ contract DerivePools {
       balances[seller][neutral][sell] = balances[seller][neutral][sell].sub(amount);
 
       neutrals[neutral].matched = neutrals[neutral].matched.sub(funds);
-      INeutralJoin(neutrals[neutral].join).join(neutrals[neutral].custodian, funds);
+      INeutralJoin(neutrals[neutral].join).exit(neutrals[neutral].custodian, funds);
     }
 
     cooldown[buyer][neutral] = cooldown[buyer][neutral].add(wait);
@@ -279,18 +279,7 @@ contract DerivePools {
 
     uint current = IERC20(party).balanceOf(address(this));
 
-    bytes memory data = getData(bytes32("transfer"), address(0), amount);
-    bytes32 _hash;
-
-    _hash = getHash(joiner, party, 0, data);
-    require(getSigner(_hash, joinSig) == joiner, "Pools/invalid-signer");
-    transferFrom(party, joiner, amount);
-
-    data = getData(bytes32("transferFrom"), exiter, amount);
-
-    _hash = getHash(exiter, party, 0, data);
-    require(getSigner(_hash, exitSig) == exiter, "Pools/invalid-signer");
-    transfer(party, exiter, amount);
+    swapi(neutral, party, joiner, exiter, joinSig, exitSig, amount);
 
     require(current == IERC20(party).balanceOf(address(this)), "Pool/different-balance");
 
@@ -307,6 +296,22 @@ contract DerivePools {
       side
     );
 
+  }
+
+  function swapi(bytes32 neutral, address party, address joiner, address exiter, bytes memory joinSig, bytes memory exitSig, uint amount) internal {
+    bytes32 _hash;
+
+    balances[joiner][neutral][party] = balances[joiner][neutral][party].add(amount);
+
+    _hash = getHash(joiner, party, 0, getData(bytes32("transfer"), address(0), amount));
+    require(getSigner(_hash, joinSig) == joiner, "Pools/invalid-signer");
+    transferFrom(party, joiner, amount);
+
+    balances[exiter][neutral][party] = balances[exiter][neutral][party].sub(amount);
+
+    _hash = getHash(exiter, party, 0, getData(bytes32("transferFrom"), exiter, amount));
+    require(getSigner(_hash, exitSig) == exiter, "Pools/invalid-signer");
+    transfer(party, exiter, amount);
   }
 
   function transferFrom(address token, address from, uint amount) internal {
