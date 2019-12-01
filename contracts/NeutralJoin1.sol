@@ -10,7 +10,7 @@ contract NeutralJoin1 is MinterRole, Ownable {
 
     VatLike         public vat;
     bytes32         public ilk;
-    address         public com;
+    address         public pool;
     uint            public dec;
     address         public gem;
 
@@ -33,13 +33,13 @@ contract NeutralJoin1 is MinterRole, Ownable {
         }
     }
 
-    constructor(address vat_, bytes32 ilk_, address com_, address gem_) public {
+    constructor(address vat_, bytes32 ilk_, address pool_, address gem_) public {
         vat = VatLike(vat_);
         ilk = ilk_;
-        com = com_;
+        pool = pool_;
         dec = 18;
         gem = gem_;
-        _addMinter(com_);
+        _addMinter(pool_);
     }
 
     function join(address usr, uint wad) public note onlyMinter {
