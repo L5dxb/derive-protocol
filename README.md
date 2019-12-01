@@ -4,7 +4,6 @@ Derive Protocol is a modified version of [MARKET Protocol](https://github.com/MA
 
 - Eliminated the fees for creating position tokens
 - Eliminated the MKT token
-- Allow users of [diss](https://github.com/komodo-finance/diss) to short their CDPs and thus insure them in case of a market drop
 - Allow users to combine long & short positions in a single token (NEUTRAL) which can be used to create [Ding stablecoins](https://github.com/komodo-finance/diss)
 
 In the initial phase, Derive will support positions on Ding, ETH and BUSD.
