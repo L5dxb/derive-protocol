@@ -13,21 +13,15 @@ contract DerivePools {
   using SafeMath for uint;
 
   event Joined(
-    bytes buySig,
-    bytes sellSig,
-    address buyer,
-    address seller,
-    uint amount,
-    bytes32 neutral
+    bytes32 neutral,
+    bool way,
+    uint delta
   );
   event Swapped(
     bytes32 neutral,
 
     bytes exitSig,
     address exiter,
-
-    bytes joinSig,
-    address joiner,
 
     uint amount,
     bool side
@@ -108,104 +102,74 @@ contract DerivePools {
   }
 
   function flip(
-    bytes calldata buySig,
-    bytes calldata sellSig,
-    address        buyer,
-    address        seller,
-    uint           amount,
-    bytes32        neutral,
-    bool           way
+    bytes[] calldata buyers,
+    bytes[] calldata sellers,
+    bytes32 neutral,
+    bool way
   ) external auth {
-    require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
-    require(cooldown[buyer][neutral] == 0 || now <= cooldown[buyer][neutral], "Pools/buyer-must-wait");
-    require(cooldown[seller][neutral] == 0 || now <= cooldown[seller][neutral], "Pools/seller-must-wait");
 
     uint currentBuy = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this));
     uint currentSell = IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this));
 
-    pool(
-      way,
-      buySig,
-      sellSig,
-      buyer,
-      seller,
-      IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN(),
-      IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN(),
-      IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)),
-      IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this)),
-      amount
-    );
-
-    if (way) {
-      require(IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)) == currentBuy.add(amount), "Pools/incorrect-internal-balance");
-    } else {
-      require(IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this)) == currentBuy.sub(amount), "Pools/incorrect-internal-balance");
+    for (uint i = 0; i < buyers.length; i++) {
+      decompose(neutral, buyers[i], way);
     }
 
-    flow(
-      neutral,
-      way,
-      amount,
-      buyer,
-      seller,
-      IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN(),
-      IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()
-    );
+    for (uint i = 0; i < sellers.length; i++) {
+      decompose(neutral, sellers[i], way);
+    }
+
+    uint delta;
+
+    if (way) {
+      delta = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)).sub(currentBuy);
+      require(delta == IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this)).sub(currentSell));
+    } else {
+      delta = currentBuy.sub(IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this)));
+      require(delta == currentSell.sub(IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this))));
+    }
+
+    flow(neutral, delta, way);
 
     emit Joined(
-      buySig,
-      sellSig,
-      buyer,
-      seller,
-      amount,
-      neutral
+      neutral,
+      way,
+      delta
     );
   }
 
-  function flow(
-    bytes32 neutral,
-    bool way,
-    uint amount,
-    address buyer,
-    address seller,
-    address buy,
-    address sell
-  ) internal {
-    uint funds = MathLib.multiply(amount, IDeriveContract(neutrals[neutral].market).COLLATERAL_PER_UNIT());
+  function decompose(bytes32 neutral, bytes memory order, bool way) internal {
+    bytes memory sig;
+    address usr;
+    uint amount;
+    bool side;
 
-    if (way) {
-      balances[buyer][neutral][buy] = balances[buyer][neutral][buy].add(amount);
-      balances[seller][neutral][sell] = balances[seller][neutral][sell].add(amount);
+    (side, sig, usr, amount) = abi.decode(order, (bool, bytes, address, uint256));
 
-      neutrals[neutral].matched = neutrals[neutral].matched.add(funds);
-      require(neutrals[neutral].matched <= neutrals[neutral].line, "Pools/above-line");
-      INeutralJoin(neutrals[neutral].join).join(neutrals[neutral].custodian, funds);
+    require(amount > 0, "Pools/invalid-amount");
+    require(cooldown[usr][neutral] == 0 || now <= cooldown[usr][neutral], "Pools/usr-must-wait");
+
+    address token;
+
+    if (side) {
+      token = IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN();
     } else {
-      balances[buyer][neutral][buy] = balances[buyer][neutral][buy].sub(amount);
-      balances[seller][neutral][sell] = balances[seller][neutral][sell].sub(amount);
-
-      neutrals[neutral].matched = neutrals[neutral].matched.sub(funds);
-      INeutralJoin(neutrals[neutral].join).exit(neutrals[neutral].custodian, funds);
+      token = IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN();
     }
 
-    cooldown[buyer][neutral] = cooldown[buyer][neutral].add(wait);
-    cooldown[seller][neutral] = cooldown[seller][neutral].add(wait);
+    pool(neutral, way, token, sig, usr, amount);
   }
 
   function pool(
+    bytes32 neutral,
     bool way,
-    bytes memory buySig,
-    bytes memory sellSig,
-    address buyer,
-    address seller,
-    address buy,
-    address sell,
-    uint currentBuy,
-    uint currentSell,
+    address token,
+    bytes memory sig,
+    address usr,
     uint amount
   ) internal {
-    require(sell != address(0) && buy != address(0), "Pool/duo-not-set");
+    require(token != address(0) && usr != address(0), "Pool/token-or-usr-null");
 
     bytes memory data;
     bytes32 _hash;
@@ -213,37 +177,38 @@ contract DerivePools {
     if (way)
       data = getData(bytes32("transfer"), address(0), amount);
     else {
-      data = getData(bytes32("transferFrom"), buyer, amount);
+      data = getData(bytes32("transferFrom"), usr, amount);
     }
 
-    _hash = getHash(buyer, buy, 0, data);
-    require(getSigner(_hash, buySig) == buyer, "Pools/invalid-signer");
+    _hash = getHash(usr, token, 0, data);
+    require(getSigner(_hash, sig) == usr, "Pools/invalid-signer");
 
     if (way) {
-      transferFrom(buy, buyer, amount);
+      transferFrom(token, usr, amount);
     } else {
-      transfer(buy, buyer, amount);
+      transfer(token, usr, amount);
     }
-
-    if (way)
-      data = getData(bytes32("transfer"), address(0), amount);
-    else {
-      data = getData(bytes32("transferFrom"), seller, amount);
-    }
-
-    _hash = getHash(seller, sell, 0, data);
-    require(getSigner(_hash, sellSig) == seller, "Pools/invalid-signer");
 
     if (way) {
-      transferFrom(sell, seller, amount);
+      balances[usr][neutral][token] = balances[usr][neutral][token].add(amount);
     } else {
-      transfer(sell, seller, amount);
+      balances[usr][neutral][token] = balances[usr][neutral][token].sub(amount);
     }
 
-    nonce[buyer]++;
-    nonce[seller]++;
+    cooldown[usr][neutral] = cooldown[usr][neutral].add(wait);
+    nonce[usr]++;
+  }
 
-    require(IERC20(buy).balanceOf(address(this)) == IERC20(sell).balanceOf(address(this)), "Pools/invalid-pairs");
+  function flow(bytes32 neutral, uint delta, bool way) internal {
+    uint underlying = MathLib.multiply(delta, IDeriveContract(neutrals[neutral].market).COLLATERAL_PER_UNIT());
+    if (way) {
+      neutrals[neutral].matched = neutrals[neutral].matched.add(underlying);
+      require(neutrals[neutral].matched <= neutrals[neutral].line, "Pools/above-line");
+      INeutralJoin(neutrals[neutral].join).join(neutrals[neutral].custodian, underlying);
+    } else {
+      neutrals[neutral].matched = neutrals[neutral].matched.sub(underlying);
+      INeutralJoin(neutrals[neutral].join).exit(neutrals[neutral].custodian, underlying);
+    }
   }
 
   function swap(
@@ -252,8 +217,7 @@ contract DerivePools {
     bytes calldata exitSig,
     address exiter,
 
-    bytes calldata joinSig,
-    address joiner,
+    bytes[] calldata joiners,
 
     uint amount,
     bool side
@@ -262,10 +226,8 @@ contract DerivePools {
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
     require(neutrals[neutral].matched >= amount, "Pools/margin-too-small");
     require(cooldown[exiter][neutral] == 0 || now <= cooldown[exiter][neutral], "Pools/exiter-must-wait");
-    require(cooldown[joiner][neutral] == 0 || now <= cooldown[joiner][neutral], "Pools/joiner-must-wait");
 
     cooldown[exiter][neutral] = cooldown[exiter][neutral].add(wait);
-    cooldown[joiner][neutral] = cooldown[joiner][neutral].add(wait);
 
     address party;
 
@@ -279,38 +241,52 @@ contract DerivePools {
 
     uint current = IERC20(party).balanceOf(address(this));
 
-    swapi(neutral, party, joiner, exiter, joinSig, exitSig, amount);
+    for (uint i = 0; i < joiners.length; i++) {
+      grab(neutral, joiners[i], party);
+    }
+
+    drain(neutral, exitSig, exiter, party, amount);
 
     require(current == IERC20(party).balanceOf(address(this)), "Pool/different-balance");
 
     nonce[exiter]++;
-    nonce[joiner]++;
 
     emit Swapped(
       neutral,
       exitSig,
       exiter,
-      joinSig,
-      joiner,
       amount,
       side
     );
-
   }
 
-  function swapi(bytes32 neutral, address party, address joiner, address exiter, bytes memory joinSig, bytes memory exitSig, uint amount) internal {
+  function grab(bytes32 neutral, bytes memory order, address party) internal {
     bytes32 _hash;
+
+    address joiner;
+    uint256 amount;
+    bytes memory sig;
+
+    (sig, joiner, amount) = abi.decode(order, (bytes, address, uint256));
+
+    require(amount > 0, "Pools/invalid-amount");
 
     balances[joiner][neutral][party] = balances[joiner][neutral][party].add(amount);
 
     _hash = getHash(joiner, party, 0, getData(bytes32("transfer"), address(0), amount));
-    require(getSigner(_hash, joinSig) == joiner, "Pools/invalid-signer");
+    require(getSigner(_hash, sig) == joiner, "Pools/invalid-signer");
     transferFrom(party, joiner, amount);
+
+    nonce[joiner]++;
+  }
+
+  function drain(bytes32 neutral, bytes memory sig, address exiter, address party, uint amount) internal {
+    bytes32 _hash;
 
     balances[exiter][neutral][party] = balances[exiter][neutral][party].sub(amount);
 
     _hash = getHash(exiter, party, 0, getData(bytes32("transferFrom"), exiter, amount));
-    require(getSigner(_hash, exitSig) == exiter, "Pools/invalid-signer");
+    require(getSigner(_hash, sig) == exiter, "Pools/invalid-exit-signer");
     transfer(party, exiter, amount);
   }
 
@@ -326,6 +302,14 @@ contract DerivePools {
     assembly {
        success := call(gas, to, value, add(data, 0x20), mload(data), 0, 0)
     }
+  }
+
+  function flipCompose(bool side, bytes memory sig, address usr, uint256 amount) public pure returns (bytes memory composed) {
+    composed = abi.encode(side, sig, usr, amount);
+  }
+
+  function swapCompose(bytes memory sig, address usr, uint256 amount) public pure returns (bytes memory composed) {
+    composed = abi.encode(sig, usr, amount);
   }
 
   function getData(bytes32 transferType, address to, uint256 amount) public returns (bytes memory) {
