@@ -1,6 +1,6 @@
 pragma solidity 0.5.11;
 
-contract IPriceFeed {
+contract IGeneralPriceFeed {
 
   function requestUpdate() public payable;
   function completeUpdate() public payable;
