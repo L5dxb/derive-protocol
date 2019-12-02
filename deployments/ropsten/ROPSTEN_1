@@ -1,0 +1,197 @@
+2_deploy_contracts.js
+=====================
+Deploying the infrastructure for derivative markets...
+
+   Deploying 'StringLib'
+   ---------------------
+   > transaction hash:    0xb96393a87a558febe75789ec08c355dd233ada91bff71a334640162293f9bda2
+   > Blocks: 0            Seconds: 20
+   > contract address:    0xfAF37a7Bde4504f43e3E105f61f4221dbEDe04c6
+   > block number:        6890522
+   > block timestamp:     1575304354
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.210546785082164152
+   > gas used:            71702
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001218934 ETH
+
+
+   Deploying 'MathLib'
+   -------------------
+   > transaction hash:    0x8a470e40d1f1cf004bd796622ba40890fde264ae42bf0f29009eaa2f2b971a16
+   > Blocks: 0            Seconds: 4
+   > contract address:    0x9663d76D4D46c0Ecb375cC479f060d25c7682045
+   > block number:        6890523
+   > block timestamp:     1575304379
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.209327851082164152
+   > gas used:            71702
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001218934 ETH
+
+
+   Deploying 'DeriveContractRegistry'
+   ----------------------------------
+   > transaction hash:    0x6d845d90e1de402e9238a1979afda1522cf757991348e0a92dff05bcdf0b926a
+   > Blocks: 2            Seconds: 16
+   > contract address:    0x0376123F2733BdC879561d9eD30C427259a9819D
+   > block number:        6890526
+   > block timestamp:     1575304394
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.198581097082164152
+   > gas used:            632162
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.010746754 ETH
+
+
+   Deploying 'DeriveCollateralPool'
+   --------------------------------
+   > transaction hash:    0x41510fd6af8fd33d00dbe78848a07187a8f4a7e1b3762e44ed47d8438be3c77d
+   > Blocks: 1            Seconds: 16
+   > contract address:    0x1a0Af2479410717f5E854322D0288298D20c90c1
+   > block number:        6890528
+   > block timestamp:     1575304423
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.178899959082164152
+   > gas used:            1157714
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.019681138 ETH
+
+Deploying the collateral pool
+Deploying vat
+
+   Deploying 'Vat'
+   ---------------
+   > transaction hash:    0xf231c4fc6dce1ac9a67c5183f4f1a5f280ce01df3453756b4eac76cbf5a24680
+   > Blocks: 0            Seconds: 8
+   > contract address:    0x1Ec7714E4056E50d6B4cFCDf7BA279C16D123Bc8
+   > block number:        6890530
+   > block timestamp:     1575304440
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.175505688082164152
+   > gas used:            199663
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003394271 ETH
+
+Deploying BUSD
+
+   Deploying 'CollateralToken'
+   ---------------------------
+   > transaction hash:    0xaa3d7a98e5e55196f84d27b03585e5d73bf0ac7ff7a627ade438bb16eb63b675
+   > Blocks: 2            Seconds: 4
+   > contract address:    0xf094eB495e73D1e5846F5E068bBF58FcA109D0E0
+   > block number:        6890533
+   > block timestamp:     1575304458
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.166291552082164152
+   > gas used:            542008
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.009214136 ETH
+
+Deploying the neutral pools
+
+   Deploying 'DerivePools'
+   -----------------------
+   > transaction hash:    0xa9959bde72067d9d223552fc5101510c9f115c582390521c047cb11e48bc8b78
+   > Blocks: 0            Seconds: 12
+   > contract address:    0x29308f26D0c502341E755a3b2e432cc02761c42f
+   > block number:        6890534
+   > block timestamp:     1575304459
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.121449955082164152
+   > gas used:            2637741
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.044841597 ETH
+
+Deploying join
+
+   Deploying 'NeutralJoin1'
+   ------------------------
+   > transaction hash:    0x9dc82c72e50acd05bd5fdc45e1e8ffb2cf6e3ffb79e4bb90e2376c9f105b8c29
+   > Blocks: 0            Seconds: 4
+   > contract address:    0xAd2c57dfb892507E900399AB53aEc058A20a2cb1
+   > block number:        6890536
+   > block timestamp:     1575304482
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.110582637082164152
+   > gas used:            639254
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.010867318 ETH
+
+Setting up price feed and oracle
+
+   Deploying 'HoneycombPriceFeed'
+   ------------------------------
+   > transaction hash:    0x15d3aa0302712e14c7acc7ba35ce13d44b029e5a97a7c7a9317bef869aafe278
+   > Blocks: 2            Seconds: 28
+   > contract address:    0xE26775D2DFeB360e8f0233515485D27268Ad5f46
+   > block number:        6890540
+   > block timestamp:     1575304499
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.093481640082164152
+   > gas used:            1005941
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.017100997 ETH
+
+Sending LINK to the price feed
+
+   Deploying 'HoneycombOracle'
+   ---------------------------
+   > transaction hash:    0xdd544235d2940db197b1e36d59b56ac8f221a85050cc8dd83fa4ae5c61dbf4fb
+   > Blocks: 4            Seconds: 68
+   > contract address:    0x09D41531109719cDD5dd218Efbc4993C7B5ef3dD
+   > block number:        6890547
+   > block timestamp:     1575304616
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.080928143082164152
+   > gas used:            687162
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.011681754 ETH
+
+Setting up market factory
+
+   Deploying 'DeriveContractFactoryDPX'
+   ------------------------------------
+   > transaction hash:    0xdeb1d597ccc5f99d4c28c850fb5145c94aa92bd85dff472ee93e485c25e98d58
+   > Blocks: 2            Seconds: 44
+   > contract address:    0x179E5f4352a60d916F72241032Bae417929f1dFf
+   > block number:        6890555
+   > block timestamp:     1575304712
+   > account:             0x5581364f1350B82Ed4E25874f3727395BF6Ce490
+   > balance:             7.034779790082164152
+   > gas used:            2658138
+   > gas price:           17 gwei
+   > value sent:          0 ETH
+   > total cost:          0.045188346 ETH
+
+Creating the first market -- DING
+Add market collateral symbol to oracle
+Requesting the price from the price feed
+Waiting for the price update...
+Latest underlying price:
+1010641000000000000
+Updating the price in the market contract
+Setting up the neutral pools
+Approving collateral and minting positions
+Approving balances to DerivePools...
+
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:         0.175154179 ETH
+
+
+Summary
+=======
+> Total deployments:   12
+> Final cost:          0.178015041 ETH

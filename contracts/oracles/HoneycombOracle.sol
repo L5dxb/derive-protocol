@@ -1,4 +1,4 @@
-pragma solidity 0.5.11;
+pragma solidity ^0.5.11;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "../interfaces/IHoneycombPriceFeed.sol";
@@ -7,7 +7,7 @@ import "../interfaces/IDeriveContractDPX.sol";
 contract HoneycombOracle is Ownable {
 
   event Requested(address derive, string ticker);
-  event Updated(address derive, int128 price);
+  event Updated(address derive, uint256 price);
   event Filed(address market, string data);
 
   IHoneycombPriceFeed public priceFeed;
