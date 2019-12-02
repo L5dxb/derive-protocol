@@ -1,11 +1,11 @@
-pragma solidity 0.5.11;
+pragma solidity ^0.5.11;
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
-import "./interfaces/IPriceFeed.sol";
-import "./interfaces/IDeriveContractDPX.sol";
+import "../interfaces/IGeneralPriceFeed.sol";
+import "../interfaces/IDeriveContractDPX.sol";
 
-contract OracleHub is Ownable {
+contract GeneralOracle is Ownable {
 
   event Requested(address feed);
   event Completed(address feed);
@@ -33,17 +33,17 @@ contract OracleHub is Ownable {
   function request() external payable {
     require(fee > 0, "Fee not set");
     require(msg.value == fee, "Did not send the correct fee");
-    IPriceFeed(oracle).requestUpdate.value(fee)();
+    IGeneralPriceFeed(oracle).requestUpdate.value(fee)();
     emit Requested(oracle);
   }
 
   function complete() external {
-    IPriceFeed(oracle).completeUpdate();
+    IGeneralPriceFeed(oracle).completeUpdate();
     emit Completed(oracle);
   }
 
   function update(address derive) external onlyOwner {
-    int128 price = IPriceFeed(oracle).priceFeed(feeds[derive]);
+    int128 price = IGeneralPriceFeed(oracle).priceFeed(feeds[derive]);
     require(price > 0, "The price must be positive");
     IDeriveContractDPX(derive).oracleCallBack(uint(price));
     emit Updated(derive, price);

@@ -14,7 +14,7 @@
     limitations under the License.
 */
 
-pragma solidity 0.5.11;
+pragma solidity ^0.5.11;
 
 import "truffle/Assert.sol";
 import "../../contracts/libraries/MathLib.sol";

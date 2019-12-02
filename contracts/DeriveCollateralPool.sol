@@ -14,14 +14,13 @@
     limitations under the License.
 */
 
-pragma solidity 0.5.11;
+pragma solidity ^0.5.11;
 
 import "./libraries/MathLib.sol";
 import "./DeriveContract.sol";
 import "./tokens/PositionToken.sol";
 import "./DeriveContractRegistryInterface.sol";
 
-import "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
@@ -33,7 +32,6 @@ import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 contract DeriveCollateralPool is Ownable {
     using MathLib for uint;
     using MathLib for int;
-    using SafeERC20 for ERC20;
 
     address public deriveContractRegistry;
 
@@ -83,7 +81,7 @@ contract DeriveCollateralPool is Ownable {
 
         // EXTERNAL CALL - transferring ERC20 tokens from sender to this contract.  User must have called
         // ERC20.approve in order for this call to succeed.
-        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransferFrom(msg.sender, address(this), neededCollateral);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).transferFrom(msg.sender, address(this), neededCollateral);
 
         // Update the collateral pool locked balance.
         contractAddressToCollateralPoolBalance[deriveContractAddress] = contractAddressToCollateralPoolBalance[
@@ -123,7 +121,7 @@ contract DeriveCollateralPool is Ownable {
 
         // EXTERNAL CALL
         // transfer collateral back to user
-        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).transfer(msg.sender, collateralToReturn);
 
         emit TokensRedeemed(
             deriveContractAddress,
@@ -174,7 +172,7 @@ contract DeriveCollateralPool is Ownable {
         ].subtract(collateralToReturn);
 
         // return collateral tokens
-        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).safeTransfer(msg.sender, collateralToReturn);
+        ERC20(deriveContract.COLLATERAL_TOKEN_ADDRESS()).transfer(msg.sender, collateralToReturn);
 
         emit TokensRedeemed(
             deriveContractAddress,
