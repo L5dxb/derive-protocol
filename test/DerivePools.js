@@ -66,8 +66,8 @@ contract('DerivePools', function(accounts) {
     await pools.file(web3.utils.asciiToHex('DPBUSD', 32), web3.utils.asciiToHex('custodian', 32), accounts[3]);
     await pools.file(web3.utils.asciiToHex('DPBUSD', 32), web3.utils.asciiToHex('join', 32), join.address);
 
-    await pools.file(web3.utils.asciiToHex('DPBUSD', 32), 100000000000000);
-    await pools.file(120);
+    await pools.setLine(web3.utils.asciiToHex('DPBUSD', 32), 100000000000000);
+    await pools.setWait(120);
 
     //INSTANTIATE CONTRACT OBJECTS
 
@@ -465,7 +465,7 @@ contract('DerivePools', function(accounts) {
   })
 
   async function createSimpleNeutral() {
-    await pools.file(0);
+    await pools.setWait(0);
 
     //Create long signature and hash
     var longHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
@@ -494,7 +494,7 @@ contract('DerivePools', function(accounts) {
   }
 
   async function createMultiNeutral() {
-    await pools.file(0);
+    await pools.setWait(0);
 
     //Create long signatures and hashes
     var longHash1 = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()

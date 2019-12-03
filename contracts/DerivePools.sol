@@ -2,13 +2,14 @@ pragma solidity ^0.5.11;
 pragma experimental ABIEncoderV2;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INeutralJoin.sol";
 import "./interfaces/IDeriveContract.sol";
 import "./libraries/MathLib.sol";
 import "./interfaces/VatLike.sol";
 
-contract DerivePools {
+contract DerivePools is Ownable {
 
   using SafeMath for uint;
 
@@ -27,17 +28,8 @@ contract DerivePools {
     bool side
   );
   event Filed(bytes32 neutral, bytes32 what, address data);
-  event Filed(bytes32 neutral, uint data);
-  event Filed(uint wait);
-
-  // --- Auth ---
-  mapping (address => uint) public wards;
-  function rely(address usr) external note auth { wards[usr] = 1; }
-  function deny(address usr) external note auth { wards[usr] = 0; }
-  modifier auth {
-      require(wards[msg.sender] == 1, "Vat/not-authorized");
-      _;
-  }
+  event SetLine(bytes32 neutral, uint data);
+  event SetWait(uint wait);
 
   struct Neutral {
     address market;
@@ -73,11 +65,9 @@ contract DerivePools {
       }
   }
 
-  constructor() public {
-    wards[msg.sender] = 1;
-  }
+  constructor() public {}
 
-  function file(bytes32 neutral, bytes32 what, address data) external auth {
+  function file(bytes32 neutral, bytes32 what, address data) external onlyOwner {
     require(neutrals[neutral].matched == 0, "Pools/matches-already-present");
 
     if (what == "market") {
@@ -91,14 +81,14 @@ contract DerivePools {
     emit Filed(neutral, what, data);
   }
 
-  function file(bytes32 neutral, uint data) external auth {
+  function setLine(bytes32 neutral, uint data) external onlyOwner {
     neutrals[neutral].line = data;
-    emit Filed(neutral, data);
+    emit SetLine(neutral, data);
   }
 
-  function file(uint data) external auth {
+  function setWait(uint data) external onlyOwner {
     wait = data;
-    emit Filed(wait);
+    emit SetWait(wait);
   }
 
   function flip(
@@ -106,7 +96,7 @@ contract DerivePools {
     bytes[] calldata sellers,
     bytes32 neutral,
     bool way
-  ) external auth {
+  ) external onlyOwner {
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
 
     uint currentBuy = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this));
@@ -221,7 +211,7 @@ contract DerivePools {
 
     uint amount,
     bool side
-  ) external auth {
+  ) external onlyOwner {
     require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
     require(neutrals[neutral].matched >= amount, "Pools/margin-too-small");
@@ -332,7 +322,7 @@ contract DerivePools {
     );
   }
 
-  function getSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
+  function getSigner(bytes32 _hash, bytes memory _signature) public pure returns (address) {
     bytes32 r;
     bytes32 s;
     uint8 v;
