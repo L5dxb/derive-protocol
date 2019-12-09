@@ -18,7 +18,7 @@ const linkTokenAddress = "0x20fe562d797a42dcb3399062ae9546cd06f63280";
 const oracle           = "0x4a3fbbb385b5efeb4bc84a25aaadcd644bd09721";
 const jobId = web3.utils.toHex("0baaacb4bc474107933fee4ce403f0f1"); //Coinlayer
 const perCallLink = "173000000000000000"
-const depositedLink = "2000000000000000000"
+const depositedLink = "8000000000000000000"
 
 module.exports = async function(deployer, network, accounts) {
 
@@ -143,12 +143,14 @@ module.exports = async function(deployer, network, accounts) {
   //Setup pools
 
   if (network == "ropsten") {
-    console.log("Setting up the neutral pools")
+    console.log("Setting vat connection for the Ding market")
     await pools.file(ilk, web3.utils.asciiToHex('market', 32), dingDPX.address);
     await pools.file(ilk, web3.utils.asciiToHex('custodian', 32), accounts[0]);
     await pools.file(ilk, web3.utils.asciiToHex('join', 32), dpbusdJoin.address);
-    await pools.file(ilk, "1000000000000000000");
-    await pools.file(0);
+    console.log("Setting line for Ding market")
+    await pools.setLine(ilk, "1000000000000000000");
+    console.log("Setting wait for the pools contract")
+    await pools.setWait(0);
   }
 
   //Mint position tokens

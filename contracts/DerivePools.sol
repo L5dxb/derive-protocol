@@ -2,13 +2,14 @@ pragma solidity ^0.5.11;
 pragma experimental ABIEncoderV2;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/INeutralJoin.sol";
 import "./interfaces/IDeriveContract.sol";
 import "./libraries/MathLib.sol";
 import "./interfaces/VatLike.sol";
 
-contract DerivePools {
+contract DerivePools is Ownable {
 
   using SafeMath for uint;
 
@@ -27,17 +28,8 @@ contract DerivePools {
     bool side
   );
   event Filed(bytes32 neutral, bytes32 what, address data);
-  event Filed(bytes32 neutral, uint data);
-  event Filed(uint wait);
-
-  // --- Auth ---
-  mapping (address => uint) public wards;
-  function rely(address usr) external note auth { wards[usr] = 1; }
-  function deny(address usr) external note auth { wards[usr] = 0; }
-  modifier auth {
-      require(wards[msg.sender] == 1, "Vat/not-authorized");
-      _;
-  }
+  event SetLine(bytes32 neutral, uint data);
+  event SetWait(uint wait);
 
   struct Neutral {
     address market;
@@ -53,6 +45,7 @@ contract DerivePools {
   mapping(address => mapping(bytes32 => mapping(address => uint))) public balances;
   mapping(address => uint256)                                      public nonce;
   mapping(address => mapping(bytes32 => uint))                     public cooldown;
+  mapping(address => uint256)                                      public update;
 
   modifier note {
       _;
@@ -73,11 +66,9 @@ contract DerivePools {
       }
   }
 
-  constructor() public {
-    wards[msg.sender] = 1;
-  }
+  constructor() public {}
 
-  function file(bytes32 neutral, bytes32 what, address data) external auth {
+  function file(bytes32 neutral, bytes32 what, address data) external onlyOwner {
     require(neutrals[neutral].matched == 0, "Pools/matches-already-present");
 
     if (what == "market") {
@@ -91,14 +82,14 @@ contract DerivePools {
     emit Filed(neutral, what, data);
   }
 
-  function file(bytes32 neutral, uint data) external auth {
+  function setLine(bytes32 neutral, uint data) external onlyOwner {
     neutrals[neutral].line = data;
-    emit Filed(neutral, data);
+    emit SetLine(neutral, data);
   }
 
-  function file(uint data) external auth {
+  function setWait(uint data) external onlyOwner {
     wait = data;
-    emit Filed(wait);
+    emit SetWait(wait);
   }
 
   function flip(
@@ -106,11 +97,13 @@ contract DerivePools {
     bytes[] calldata sellers,
     bytes32 neutral,
     bool way
-  ) external auth {
+  ) external onlyOwner {
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
 
     uint currentBuy = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this));
     uint currentSell = IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this));
+
+    //Decompose
 
     for (uint i = 0; i < buyers.length; i++) {
       decompose(neutral, buyers[i], way);
@@ -118,6 +111,16 @@ contract DerivePools {
 
     for (uint i = 0; i < sellers.length; i++) {
       decompose(neutral, sellers[i], way);
+    }
+
+    //Update cooldowns
+
+    for (uint i = 0; i < buyers.length; i++) {
+      cool(neutral, buyers[i]);
+    }
+
+    for (uint i = 0; i < sellers.length; i++) {
+      cool(neutral, sellers[i]);
     }
 
     uint delta;
@@ -139,6 +142,14 @@ contract DerivePools {
     );
   }
 
+  function cool(bytes32 neutral, bytes memory order) internal {
+    address usr;
+    (, , usr, ) = abi.decode(order, (bool, bytes, address, uint256));
+    if (cooldown[usr][neutral] <= now) {
+      cooldown[usr][neutral] = now.add(wait);
+    }
+  }
+
   function decompose(bytes32 neutral, bytes memory order, bool way) internal {
     bytes memory sig;
     address usr;
@@ -148,7 +159,7 @@ contract DerivePools {
     (side, sig, usr, amount) = abi.decode(order, (bool, bytes, address, uint256));
 
     require(amount > 0, "Pools/invalid-amount");
-    require(cooldown[usr][neutral] == 0 || now <= cooldown[usr][neutral], "Pools/usr-must-wait");
+    require(cooldown[usr][neutral] == 0 || now >= cooldown[usr][neutral], "Pools/usr-must-wait");
 
     address token;
 
@@ -195,7 +206,6 @@ contract DerivePools {
       balances[usr][neutral][token] = balances[usr][neutral][token].sub(amount);
     }
 
-    cooldown[usr][neutral] = cooldown[usr][neutral].add(wait);
     nonce[usr]++;
   }
 
@@ -221,13 +231,13 @@ contract DerivePools {
 
     uint amount,
     bool side
-  ) external auth {
+  ) external onlyOwner {
     require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
     require(neutrals[neutral].matched >= amount, "Pools/margin-too-small");
-    require(cooldown[exiter][neutral] == 0 || now <= cooldown[exiter][neutral], "Pools/exiter-must-wait");
+    require(cooldown[exiter][neutral] == 0 || now >= cooldown[exiter][neutral], "Pools/exiter-must-wait");
 
-    cooldown[exiter][neutral] = cooldown[exiter][neutral].add(wait);
+    cooldown[exiter][neutral] = now.add(wait);
 
     address party;
 
@@ -270,6 +280,7 @@ contract DerivePools {
     (sig, joiner, amount) = abi.decode(order, (bytes, address, uint256));
 
     require(amount > 0, "Pools/invalid-amount");
+    require(cooldown[joiner][neutral] == 0 || now >= cooldown[joiner][neutral], "Pools/joiner-must-wait");
 
     balances[joiner][neutral][party] = balances[joiner][neutral][party].add(amount);
 
@@ -277,6 +288,7 @@ contract DerivePools {
     require(getSigner(_hash, sig) == joiner, "Pools/invalid-signer");
     transferFrom(party, joiner, amount);
 
+    cooldown[joiner][neutral] = now.add(wait);
     nonce[joiner]++;
   }
 
@@ -332,7 +344,19 @@ contract DerivePools {
     );
   }
 
-  function getSigner(bytes32 _hash, bytes memory _signature) internal pure returns (address) {
+  function getHashWithNextNonce(address signer, address destination, uint value, bytes memory data, uint distance)
+    public view returns (bytes32) {
+    return keccak256(abi.encodePacked(
+      address(this),
+      signer,
+      destination,
+      value,
+      data,
+      nonce[signer].add(distance))
+    );
+  }
+
+  function getSigner(bytes32 _hash, bytes memory _signature) public pure returns (address) {
     bytes32 r;
     bytes32 s;
     uint8 v;
