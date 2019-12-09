@@ -45,6 +45,7 @@ contract DerivePools is Ownable {
   mapping(address => mapping(bytes32 => mapping(address => uint))) public balances;
   mapping(address => uint256)                                      public nonce;
   mapping(address => mapping(bytes32 => uint))                     public cooldown;
+  mapping(address => uint256)                                      public update;
 
   modifier note {
       _;
@@ -102,12 +103,24 @@ contract DerivePools is Ownable {
     uint currentBuy = IERC20(IDeriveContract(neutrals[neutral].market).LONG_POSITION_TOKEN()).balanceOf(address(this));
     uint currentSell = IERC20(IDeriveContract(neutrals[neutral].market).SHORT_POSITION_TOKEN()).balanceOf(address(this));
 
+    //Decompose
+
     for (uint i = 0; i < buyers.length; i++) {
       decompose(neutral, buyers[i], way);
     }
 
     for (uint i = 0; i < sellers.length; i++) {
       decompose(neutral, sellers[i], way);
+    }
+
+    //Update cooldowns
+
+    for (uint i = 0; i < buyers.length; i++) {
+      cool(neutral, buyers[i]);
+    }
+
+    for (uint i = 0; i < sellers.length; i++) {
+      cool(neutral, sellers[i]);
     }
 
     uint delta;
@@ -129,6 +142,14 @@ contract DerivePools is Ownable {
     );
   }
 
+  function cool(bytes32 neutral, bytes memory order) internal {
+    address usr;
+    (, , usr, ) = abi.decode(order, (bool, bytes, address, uint256));
+    if (cooldown[usr][neutral] <= now) {
+      cooldown[usr][neutral] = now.add(wait);
+    }
+  }
+
   function decompose(bytes32 neutral, bytes memory order, bool way) internal {
     bytes memory sig;
     address usr;
@@ -138,7 +159,7 @@ contract DerivePools is Ownable {
     (side, sig, usr, amount) = abi.decode(order, (bool, bytes, address, uint256));
 
     require(amount > 0, "Pools/invalid-amount");
-    require(cooldown[usr][neutral] == 0 || now <= cooldown[usr][neutral], "Pools/usr-must-wait");
+    require(cooldown[usr][neutral] == 0 || now >= cooldown[usr][neutral], "Pools/usr-must-wait");
 
     address token;
 
@@ -185,7 +206,6 @@ contract DerivePools is Ownable {
       balances[usr][neutral][token] = balances[usr][neutral][token].sub(amount);
     }
 
-    cooldown[usr][neutral] = cooldown[usr][neutral].add(wait);
     nonce[usr]++;
   }
 
@@ -215,9 +235,9 @@ contract DerivePools is Ownable {
     require(amount > 0, "Pools/invalid-amount");
     require(neutrals[neutral].market != address(0), "Pools/market-not-set");
     require(neutrals[neutral].matched >= amount, "Pools/margin-too-small");
-    require(cooldown[exiter][neutral] == 0 || now <= cooldown[exiter][neutral], "Pools/exiter-must-wait");
+    require(cooldown[exiter][neutral] == 0 || now >= cooldown[exiter][neutral], "Pools/exiter-must-wait");
 
-    cooldown[exiter][neutral] = cooldown[exiter][neutral].add(wait);
+    cooldown[exiter][neutral] = now.add(wait);
 
     address party;
 
@@ -260,6 +280,7 @@ contract DerivePools is Ownable {
     (sig, joiner, amount) = abi.decode(order, (bytes, address, uint256));
 
     require(amount > 0, "Pools/invalid-amount");
+    require(cooldown[joiner][neutral] == 0 || now >= cooldown[joiner][neutral], "Pools/joiner-must-wait");
 
     balances[joiner][neutral][party] = balances[joiner][neutral][party].add(amount);
 
@@ -267,6 +288,7 @@ contract DerivePools is Ownable {
     require(getSigner(_hash, sig) == joiner, "Pools/invalid-signer");
     transferFrom(party, joiner, amount);
 
+    cooldown[joiner][neutral] = now.add(wait);
     nonce[joiner]++;
   }
 
@@ -319,6 +341,18 @@ contract DerivePools is Ownable {
       value,
       data,
       nonce[signer])
+    );
+  }
+
+  function getHashWithNextNonce(address signer, address destination, uint value, bytes memory data, uint distance)
+    public view returns (bytes32) {
+    return keccak256(abi.encodePacked(
+      address(this),
+      signer,
+      destination,
+      value,
+      data,
+      nonce[signer].add(distance))
     );
   }
 

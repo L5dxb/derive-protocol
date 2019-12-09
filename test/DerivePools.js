@@ -172,6 +172,60 @@ contract('DerivePools', function(accounts) {
 
   })
 
+  it('should join a valid long/short pair from the same sender', async function() {
+
+    //Create long signature and hash
+    var longHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    longHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longHash).call()
+    var longSignature = web3.eth.accounts.sign(longHash, longHolderPrivKey1);
+
+    //Create short signature and hash
+    var shortHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    shortHash = await poolsContract.methods.getHashWithNextNonce(accounts[1], shortPositionTokens.address, 0, shortHash, 1).call()
+    var shortSignature = web3.eth.accounts.sign(shortHash, longHolderPrivKey1);
+
+    //Approve transfers
+    await longPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+    await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+
+    //Pack vars
+    var packedLong = await poolsContract.methods.flipCompose(true, longSignature.signature, accounts[1], 10).call()
+    var packedShort = await poolsContract.methods.flipCompose(false, shortSignature.signature, accounts[1], 10).call()
+
+    await pools.flip(
+      [packedLong],
+      [packedShort],
+      web3.utils.asciiToHex('DPBUSD', 32),
+      true
+    )
+
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString())
+
+    var longInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+    var shortInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+
+    assert(longInternalBalance.toString() == shortInternalBalance.toString())
+    assert(longInternalBalance.toString() == "10")
+
+    var longCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+    var shortCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(longCooldown.toString() == shortCooldown.toString())
+    assert(longCooldown.toString() != "0")
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "3000")
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "3000")
+
+  })
+
   it('should exit a valid long/short pair', async function() {
 
     await createSimpleNeutral();
@@ -211,7 +265,7 @@ contract('DerivePools', function(accounts) {
     var shortCooldown = await poolsContract.methods.cooldown(accounts[2], web3.utils.asciiToHex('DPBUSD', 32)).call();
 
     assert(longCooldown.toString() == shortCooldown.toString());
-    assert(longCooldown.toString() == "0");
+    assert(longCooldown.toString() != "0");
 
     var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
 
@@ -220,7 +274,84 @@ contract('DerivePools', function(accounts) {
     var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
 
     assert(gem.toString() == "0");
+  })
 
+  it('should exit a valid long/short pair from the same sender', async function() {
+
+    await pools.setWait(0);
+
+    //ENTER
+
+    //Create long signature and hash
+    var longHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    longHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longHash).call()
+    var longSignature = web3.eth.accounts.sign(longHash, longHolderPrivKey1);
+
+    //Create short signature and hash
+    var shortHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transfer', 32), pools.address, 10).call()
+    shortHash = await poolsContract.methods.getHashWithNextNonce(accounts[1], shortPositionTokens.address, 0, shortHash, 1).call()
+    var shortSignature = web3.eth.accounts.sign(shortHash, longHolderPrivKey1);
+
+    //Approve transfers
+    await longPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+    await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
+
+    //Pack vars
+    var packedLong = await poolsContract.methods.flipCompose(true, longSignature.signature, accounts[1], 10).call()
+    var packedShort = await poolsContract.methods.flipCompose(false, shortSignature.signature, accounts[1], 10).call()
+
+    await pools.flip(
+      [packedLong],
+      [packedShort],
+      web3.utils.asciiToHex('DPBUSD', 32),
+      true
+    )
+
+    //EXIT
+
+    var longExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[1], 10).call()
+    longExitHash = await poolsContract.methods.getHash(accounts[1], longPositionTokens.address, 0, longExitHash).call()
+    var longExitSignature = web3.eth.accounts.sign(longExitHash, longHolderPrivKey1);
+
+    var shortExitHash = await poolsContract.methods.getData(web3.utils.asciiToHex('transferFrom', 32), accounts[1], 10).call()
+    shortExitHash = await poolsContract.methods.getHashWithNextNonce(accounts[1], shortPositionTokens.address, 0, shortExitHash, 1).call()
+    var shortExitSignature = web3.eth.accounts.sign(shortExitHash, longHolderPrivKey1);
+
+    var packedExitLong = await poolsContract.methods.flipCompose(true, longExitSignature.signature, accounts[1], 10).call()
+    var packedExitShort = await poolsContract.methods.flipCompose(false, shortExitSignature.signature, accounts[1], 10).call()
+
+    await pools.flip(
+      [packedExitLong],
+      [packedExitShort],
+      web3.utils.asciiToHex('DPBUSD', 32),
+      false
+    )
+
+    var poolsLongBalance = await longPositionTokensContract.methods.balanceOf(pools.address).call();
+    var poolsShortBalance = await shortPositionTokensContract.methods.balanceOf(pools.address).call();
+
+    assert(poolsLongBalance.toString() == poolsShortBalance.toString());
+    assert(poolsLongBalance.toString() == "0");
+
+    var longInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), longPositionTokens.address).call()
+    var shortInternalBalance = await poolsContract.methods.balances(accounts[1], web3.utils.asciiToHex('DPBUSD', 32), shortPositionTokens.address).call()
+
+    assert(longInternalBalance.toString() == shortInternalBalance.toString());
+    assert(longInternalBalance.toString() == "0");
+
+    var longCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+    var shortCooldown = await poolsContract.methods.cooldown(accounts[1], web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(longCooldown.toString() == shortCooldown.toString());
+    assert(longCooldown.toString() != "0");
+
+    var neutral = await poolsContract.methods.neutrals(web3.utils.asciiToHex('DPBUSD', 32)).call();
+
+    assert(neutral.matched.toString() == "0");
+
+    var gem = await vatContract.methods.gem(web3.utils.asciiToHex('DPBUSD', 32), accounts[3]).call();
+
+    assert(gem.toString() == "0");
   })
 
   it('should entirely swap a long position', async function() {
@@ -292,10 +423,6 @@ contract('DerivePools', function(accounts) {
     //Approve transfers
     await longPositionTokens.approve(pools.address, "-1", {from: accounts[2]});
     await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
-
-    //Approve transfers
-    // await longPositionTokens.approve(pools.address, "-1", {from: accounts[2]});
-    // await shortPositionTokens.approve(pools.address, "-1", {from: accounts[1]});
 
     //Pack data
     var packedJoin = await poolsContract.methods.swapCompose(shortNewJoinSignature.signature, accounts[1], 10).call()
