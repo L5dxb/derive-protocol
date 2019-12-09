@@ -8,6 +8,8 @@ Derive Protocol is a modified version of [MARKET Protocol](https://github.com/MA
 
 In the initial phase, Derive will support positions on Ding, ETH and BUSD.
 
+The [Honeycomb Market's](https://honeycomb.market/) oracle services are used to provide underlying ticker data.
+
 ## Dependencies
 This project uses Node.js version 8.10.0 - 8.11.3.
 
